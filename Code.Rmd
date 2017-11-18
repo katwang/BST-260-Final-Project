@@ -1,0 +1,11 @@
+---
+title: 'BST 260: EHR'
+author: Katherine Wang, Lauren Yoo, Eunice Yeh
+output: html_document
+---
+
+
+```{r}
+
+```
+
