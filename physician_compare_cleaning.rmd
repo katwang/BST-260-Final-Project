@@ -188,11 +188,11 @@ zip_dat %>% left_join(zipcode,by='zip') %>% select(NPI, Zip.Code, zip, zip.ext, 
 
 ```{r}
 # those with some kind of hospital affiliation
-hosp <- zip_dat %>% filter(Hospital.affiliation.CCN.1 != "")
+hosp <- zip_dat %>% filter(Hospital.affiliation.CCN.1 != "" | Hospital.affiliation.CCN.2 != "" | Hospital.affiliation.CCN.3 != "" | Hospital.affiliation.CCN.4 != "" | !is.na(Hospital.affiliation.CCN.5))
 saveRDS(hosp, file="hosp.rds")
 
 # those without any hospital affiliation (#1)
-phys <- zip_dat %>% filter(Hospital.affiliation.CCN.1 == "")
+phys <- zip_dat %>% filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5))
 saveRDS(phys, file="phys.rds")
 
 # tempname <- readRDS("hosp.rds")
