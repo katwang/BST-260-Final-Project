@@ -1,0 +1,202 @@
+---
+title: 'BST 260 Final Project: Cleaning Physician Compare National Data File'
+author: Eunice Yeh
+output: html_document
+---
+
+# Purpose
+1. explore the data
+2. summarize key variables
+3. clean data: decide which rows and columns to filter out
+
+
+```{r}
+dat <- read.csv("Physician_Compare_National_Downloadable_File.csv")
+```
+
+
+```{r}
+str(dat)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+table(dat$Professional.accepts.Medicare.Assignment)
+```
+
+
+
+```{r}
+# distribution of graduation year by use of EHR and by credential
+gradyr <- dat %>% filter(!is.na(Graduation.year)) %>% 
+  group_by(Credential, Used.electronic.health.records) 
+
+gradyr %>% 
+  ggplot(aes(Graduation.year)) +
+  geom_histogram(color = "black") +
+  facet_grid(.~Used.electronic.health.records) +
+  ggtitle("Distribution of Grduation Year by Use of EHR")
+
+gradyr %>% filter(Used.electronic.health.records == 'Y') %>%
+  ungroup() %>% 
+  mutate(Credential = reorder(Credential, Graduation.year)) %>% 
+  ggplot(aes(factor(Credential), Graduation.year)) +
+  geom_boxplot() + 
+  # scale_y_continuous(trans = "sqrt", breaks = seq(0, 100, 2)^2) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("Credential") +
+  ylab("Graduation Year") +
+  ggtitle("Dist of Grad Year by Credential among those who used EHR")
+
+gradyr %>%
+  ungroup() %>% 
+  mutate(Credential = reorder(Credential, Graduation.year)) %>% 
+  ggplot(aes(factor(Credential), Graduation.year)) +
+  geom_boxplot() + 
+  facet_grid(.~Used.electronic.health.records) +
+  # scale_y_continuous(trans = "sqrt", breaks = seq(0, 100, 2)^2) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("Credential") +
+  ylab("Graduation Year") +
+  ggtitle("Dist of Grad Year by Credential")
+```
+
+
+```{r}
+# distribution of graduation year by state
+# it's about the same across state overall, so further look at use of EHR
+# for those who used EHR
+gradyr %>% ungroup() %>% filter(Used.electronic.health.records == 'Y') %>% 
+  mutate(State = reorder(State, Graduation.year)) %>% 
+  ggplot(aes(factor(State), Graduation.year)) +
+  geom_boxplot() + 
+  # facet_grid(.~Used.electronic.health.records) +
+  # scale_y_continuous(trans = "sqrt", breaks = seq(0, 100, 2)^2) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("US State") +
+  ylab("Graduation Year") +
+  ggtitle("Dist of Grad Year by State among those who used EHR")
+
+# for those who did not indicate having used EHR
+gradyr %>% ungroup() %>% filter(Used.electronic.health.records != 'Y') %>% 
+  mutate(State = reorder(State, Graduation.year)) %>% 
+  ggplot(aes(factor(State), Graduation.year)) +
+  geom_boxplot() + 
+  # facet_grid(.~Used.electronic.health.records) +
+  # scale_y_continuous(trans = "sqrt", breaks = seq(0, 100, 2)^2) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("US State") +
+  ylab("Graduation Year") +
+  ggtitle("Dist of Grad Year by State among those who have not used EHR")
+```
+
+
+```{r}
+# proportion of EHR used by state
+EHR_bystate <- dat %>% 
+  group_by(State) %>% 
+  summarize(EHR_count = sum(Used.electronic.health.records == 'Y'), total = n(), 
+            EHR_prop = EHR_count/total)
+EHR_bystate
+```
+
+```{r}
+EHR_bystate %>% mutate(State = reorder(State, EHR_prop)) %>% 
+  ggplot(aes(factor(State), EHR_prop)) +
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("State") +
+  ylab("Proportion of EHR Used") +
+  ggtitle("Proportion of EHR Used by State")
+```
+
+```{r}
+# median graduation year by proportion of EHR use across states
+EHR_primspec_bystate <- dat %>% 
+  filter(!is.na(Graduation.year)) %>% 
+  group_by(State, Primary.specialty) %>% 
+  # consider filtering by n() > 10 or 100?
+  summarize(EHR_count = sum(Used.electronic.health.records == 'Y'), total = n(), EHR_percent = EHR_count/total * 100) %>% 
+  mutate(Primary.specialty = reorder(Primary.specialty, EHR_percent))
+EHR_primspec_bystate
+```
+
+
+```{r}
+# proportion of EHR use by median grad year and state
+library(RColorBrewer)
+EHR_primspec_bystate %>% filter(total > 100) %>% 
+  ggplot(aes(Primary.specialty, State,  fill = EHR_percent)) +
+  geom_tile(color = "grey50") +
+  # scale_x_continuous(expand=c(0,0)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+  scale_fill_gradientn(colors = brewer.pal(9, "YlGn")) +  
+  theme(panel.grid = element_blank()) +
+  ylab("US States") + 
+  xlab("Primary Specialty") +
+  ggtitle("Percentage of EHR Used by Primary Specialty and States")
+```
+
+
+
+# Data Cleaning Decisions:
+
+1. filter out states outside of the main 50 + DC, which are:  PR, MP, GU, ID, VI
+
+```{r}
+unique(dat$State)
+data("state")
+new_dat <- dat[dat$State %in% unique(state.abb) == "TRUE" | dat$State == "DC", ]
+unique(new_dat$State)
+```
+
+2. keep only rows with Professional.accepts.Medicare.Assignment = 'Y'
+
+```{r}
+table(new_dat$Professional.accepts.Medicare.Assignment)
+filtered_dat <- new_dat %>% filter(Professional.accepts.Medicare.Assignment == 'Y')
+table(filtered_dat$Professional.accepts.Medicare.Assignment)
+```
+
+3. variables to keep: NPI, last and first name, gender, credential, medical school name, grad year, prim specialty, all sec specialties,  organization legal name, num of group practice members, city, state, zip code,  hospital affiliation CCNs and LBNs,  used EHR, reported qual measures
+
+```{r}
+select_dat <- filtered_dat %>% select(-PAC.ID, -Professional.Enrollment.ID, -Middle.Name, -Suffix, -Group.Practice.PAC.ID, -Line.1.Street.Address, -Line.2.Street.Address, -Marker.of.address.line.2.suppression, -Phone.Number, -Professional.accepts.Medicare.Assignment, -Committed.to.heart.health.through.the.Million.HeartsÂ..initiative.)
+str(select_dat)
+```
+
+4. merge in accurate city, state, latitude, longitude information by zip codes
+
+```{r}
+# separate out the first five zip codes from the last four extension
+ziptest <- select_dat$Zip.Code[1]
+ziptest
+substr(as.character(ziptest), 1, 5)
+substr(as.character(ziptest), 6, 9)
+zip_dat <- select_dat %>% mutate(zip = substr(as.character(Zip.Code), 1, 5), zip.ext = substr(as.character(Zip.Code), 6, 9))
+
+# R has zipcode package and data
+library(zipcode)
+data("zipcode")
+zip_dat %>% left_join(zipcode,by='zip') %>% select(NPI, Zip.Code, zip, zip.ext, City, State, city, state, latitude, longitude)
+```
+
+5. separate into two datasets by hospital affiliation
+
+```{r}
+# those with some kind of hospital affiliation
+hosp <- zip_dat %>% filter(Hospital.affiliation.CCN.1 != "")
+saveRDS(hosp, file="hosp.rds")
+
+# those without any hospital affiliation (#1)
+phys <- zip_dat %>% filter(Hospital.affiliation.CCN.1 == "")
+saveRDS(phys, file="phys.rds")
+
+# tempname <- readRDS("hosp.rds")
+```
+
+
+
