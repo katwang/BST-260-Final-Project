@@ -5,32 +5,32 @@ output: html_document
 ---
 
 # Purpose
-1. explore the data
-2. summarize key variables
-3. clean data: decide which rows and columns to filter out
+1. explore the data and summarize key variables
+2. clean/reduce data: decide which rows and columns to filter out
 
-
+## 1. Exploratory Analysis
+Import data from `.csv` file.
 ```{r}
 dat <- read.csv("Physician_Compare_National_Downloadable_File.csv")
 ```
 
-
+Quick look at the data structure.
 ```{r}
 str(dat)
 ```
 
+Load `tidyverse` package for data wrangling and plotting functions.
 ```{r}
 library(tidyverse)
 ```
 
+Check frequency of Medicare assignment acceptance.
 ```{r}
 table(dat$Professional.accepts.Medicare.Assignment)
 ```
 
-
-
+Look at the distribution of physician graduation year by physician credentials and by use of EHR.
 ```{r}
-# distribution of graduation year by use of EHR and by credential
 gradyr <- dat %>% filter(!is.na(Graduation.year)) %>% 
   group_by(Credential, Used.electronic.health.records) 
 
@@ -64,10 +64,8 @@ gradyr %>%
   ggtitle("Dist of Grad Year by Credential")
 ```
 
-
+Look at the distribution of physician graduation year by US States separately for those who used EHR and for those who have not indicated using EHR.
 ```{r}
-# distribution of graduation year by state
-# it's about the same across state overall, so further look at use of EHR
 # for those who used EHR
 gradyr %>% ungroup() %>% filter(Used.electronic.health.records == 'Y') %>% 
   mutate(State = reorder(State, Graduation.year)) %>% 
@@ -90,12 +88,11 @@ gradyr %>% ungroup() %>% filter(Used.electronic.health.records != 'Y') %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
   xlab("US State") +
   ylab("Graduation Year") +
-  ggtitle("Dist of Grad Year by State among those who have not used EHR")
+  ggtitle("Dist of Grad Year by State among those who have not indicated using EHR")
 ```
 
-
+Calculate the proportion of EHR use by State.
 ```{r}
-# proportion of EHR used by state
 EHR_bystate <- dat %>% 
   group_by(State) %>% 
   summarize(EHR_count = sum(Used.electronic.health.records == 'Y'), total = n(), 
@@ -103,6 +100,7 @@ EHR_bystate <- dat %>%
 EHR_bystate
 ```
 
+Plot the proportion of EHR use by State.
 ```{r}
 EHR_bystate %>% mutate(State = reorder(State, EHR_prop)) %>% 
   ggplot(aes(factor(State), EHR_prop)) +
@@ -113,20 +111,18 @@ EHR_bystate %>% mutate(State = reorder(State, EHR_prop)) %>%
   ggtitle("Proportion of EHR Used by State")
 ```
 
+Calculate the percentage of EHR use by Primary Specialty and by State. -- consider filterning out n() < 50 or 100?
 ```{r}
-# median graduation year by proportion of EHR use across states
 EHR_primspec_bystate <- dat %>% 
   filter(!is.na(Graduation.year)) %>% 
   group_by(State, Primary.specialty) %>% 
-  # consider filtering by n() > 10 or 100?
   summarize(EHR_count = sum(Used.electronic.health.records == 'Y'), total = n(), EHR_percent = EHR_count/total * 100) %>% 
   mutate(Primary.specialty = reorder(Primary.specialty, EHR_percent))
 EHR_primspec_bystate
 ```
 
-
+Plot the percentage of EHR use by Primary Specialty and by State.
 ```{r}
-# proportion of EHR use by median grad year and state
 library(RColorBrewer)
 EHR_primspec_bystate %>% filter(total > 100) %>% 
   ggplot(aes(Primary.specialty, State,  fill = EHR_percent)) +
@@ -141,10 +137,9 @@ EHR_primspec_bystate %>% filter(total > 100) %>%
 ```
 
 
+## 2. Data Cleaning Decisions:
 
-# Data Cleaning Decisions:
-
-1. filter out states outside of the main 50 + DC, which are:  PR, MP, GU, ID, VI
+1. filter out states outside of the main 50 except for DC since there is not a lot of information in those states and the other data we want to merge with do not contain information on these states anyway.
 
 ```{r}
 unique(dat$State)
@@ -153,7 +148,7 @@ new_dat <- dat[dat$State %in% unique(state.abb) == "TRUE" | dat$State == "DC", ]
 unique(new_dat$State)
 ```
 
-2. keep only rows with Professional.accepts.Medicare.Assignment = 'Y'
+2. keep only rows with `Professional.accepts.Medicare.Assignment = 'Y'` since we are only interested in practioners who have definitely accepted medicare assignments, and we need to merge with other data that only contain those serving Medicare.
 
 ```{r}
 table(new_dat$Professional.accepts.Medicare.Assignment)
@@ -161,14 +156,15 @@ filtered_dat <- new_dat %>% filter(Professional.accepts.Medicare.Assignment == '
 table(filtered_dat$Professional.accepts.Medicare.Assignment)
 ```
 
-3. variables to keep: NPI, last and first name, gender, credential, medical school name, grad year, prim specialty, all sec specialties,  organization legal name, num of group practice members, city, state, zip code,  hospital affiliation CCNs and LBNs,  used EHR, reported qual measures
+3. key variables are NPI, last and first name, gender, credential, medical school name, grad year, prim specialty, all sec specialties,  organization legal name, num of group practice members, city, state, zip code,  hospital affiliation CCNs and LBNs,  used EHR, reported qual measures.
 
 ```{r}
+# easier to exclude using -
 select_dat <- filtered_dat %>% select(-PAC.ID, -Professional.Enrollment.ID, -Middle.Name, -Suffix, -Group.Practice.PAC.ID, -Line.1.Street.Address, -Line.2.Street.Address, -Marker.of.address.line.2.suppression, -Phone.Number, -Professional.accepts.Medicare.Assignment, -Committed.to.heart.health.through.the.Million.HeartsÂ..initiative.)
 str(select_dat)
 ```
 
-4. merge in accurate city, state, latitude, longitude information by zip codes
+4. merge in accurate city, state, latitude, longitude information by zip codes using the `zipcode` package.
 
 ```{r}
 # separate out the first five zip codes from the last four extension
@@ -178,25 +174,36 @@ substr(as.character(ziptest), 1, 5)
 substr(as.character(ziptest), 6, 9)
 zip_dat <- select_dat %>% mutate(zip = substr(as.character(Zip.Code), 1, 5), zip.ext = substr(as.character(Zip.Code), 6, 9))
 
-# R has zipcode package and data
+# use R zipcode package and data
 library(zipcode)
 data("zipcode")
-zip_dat %>% left_join(zipcode,by='zip') %>% select(NPI, Zip.Code, zip, zip.ext, City, State, city, state, latitude, longitude)
+zip_dat <- zip_dat %>% left_join(zipcode,by='zip') 
+zip_dat %>% select(NPI, Zip.Code, zip, zip.ext, City, State, city, state, latitude, longitude) %>% head(.,20)
 ```
 
-5. separate into two datasets by hospital affiliation
+Check mismatched city and state between our data and the zipcode data from R.
+```{r}
+zip_dat %>% mutate(City = as.character(City), city = toupper(as.character(city))) %>% filter(City != city) %>% select(NPI, Zip.Code, City, city, State, state) %>% head(.,50)
+zip_dat %>% mutate(State = as.character(State), state = as.character(state)) %>% filter(State != state) %>% select(NPI, Zip.Code, City, city, State, state) %>% head(.,50)
+```
+
+5. keep only one record per physician (using NPI, first/last name, graduation year, primary specialty and state just to be extra precise)
+```{r}
+library(dplyr)
+unique_dat <- zip_dat %>% distinct(NPI, Last.Name, First.Name, Graduation.year, Primary.specialty, State, .keep_all = TRUE)
+```
+Note that the argument `.keep_all = TRUE` keeps all other variables not considered in the combination of variables that determine the uniqueness. If the combination is not distinct, the first row of values is kept, which is fine because we don't really care as much about the other variables. For example, the organization legal name and city may vary across multiple rows for the same physician who owns a private practice and renames or moves the practice around the area but still within the same state.
+
+6. separate into two datasets by hospital affiliation vs. none
 
 ```{r}
 # those with some kind of hospital affiliation
-hosp <- zip_dat %>% filter(Hospital.affiliation.CCN.1 != "" | Hospital.affiliation.CCN.2 != "" | Hospital.affiliation.CCN.3 != "" | Hospital.affiliation.CCN.4 != "" | !is.na(Hospital.affiliation.CCN.5))
+hosp <- unique_dat %>% filter(Hospital.affiliation.CCN.1 != "" | Hospital.affiliation.CCN.2 != "" | Hospital.affiliation.CCN.3 != "" | Hospital.affiliation.CCN.4 != "" | !is.na(Hospital.affiliation.CCN.5))
 saveRDS(hosp, file="hosp.rds")
 
-# those without any hospital affiliation (#1)
-phys <- zip_dat %>% filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5))
+# those without any hospital affiliation
+phys <- unique_dat %>% filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5))
 saveRDS(phys, file="phys.rds")
-
-# tempname <- readRDS("hosp.rds")
 ```
-
 
 
