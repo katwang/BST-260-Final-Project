@@ -10,8 +10,14 @@ dat_quality<- read.csv("2016_Child_and_Adult_Health_Care_Quality_Measures.csv")
 dat_compendium <- read.csv("AHRQ_CHSP_Compendium-9-17.csv")
 dat_ehr <- read.csv("Medicaid_Electronic_Health_Records_Incentive_Program_Provider_Payments__Beginning_2011.csv")
 
-head(dataset1)
-head(dataset2)
-head(dataset3)
+head(dat_quality)
+head(dat_compendium)
+head(dat_ehr)
+
+names(dat_quality)
+names(dat_compendium)
+names(dat_ehr)
+
+summary(dat_compendium$hosp_cnt)
 ```
 
