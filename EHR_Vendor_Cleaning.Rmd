@@ -69,10 +69,10 @@ dat_mu <- dat_mu %>% filter(Business_State_Territory %in% state.name |   Busines
 dat_mu_zip <- dat_mu %>% filter(ZIP == "" | nchar(as.character(ZIP)) == 5)
 
 # select physician columns
-dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% select(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
 # select hospital columns
-dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% select(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)## %>% select(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 ```
 
 ##Exploratory
@@ -129,10 +129,10 @@ mapplot %>%
 ##Save R Data
 ```{r}
 # select physician data
-dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% select(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
 # select hospital data
-dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% select(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
 saveRDS(dat_mu_ep, file = "vendor_phys.rds")
 saveRDS(dat_mu_hosp, file = "vendor_hosp.rds")
