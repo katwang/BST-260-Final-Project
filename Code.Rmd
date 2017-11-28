@@ -17,7 +17,5 @@ head(dat_ehr)
 names(dat_quality)
 names(dat_compendium)
 names(dat_ehr)
-
-summary(dat_compendium$hosp_cnt)
 ```
 
