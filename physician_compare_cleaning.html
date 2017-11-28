@@ -600,10 +600,10 @@ zip_dat %&gt;% select(NPI, Zip.Code, zip, zip.ext, City, State, city, state, lat
 ## 49 1871676445 993621202    WALLA WALLA     Walla Walla    WA    OR
 ## 50 1811042849 527613443      MUSCATINE       Muscatine    IA    IL</code></pre>
 <ol start="5" style="list-style-type: decimal">
-<li>keep only one record per physician (using NPI, first/last name, graduation year, primary specialty and state just to be extra precise)</li>
+<li>keep only one record per physician (using NPI, first/last name, graduation year, primary specialty and state and zip just to be extra precise)</li>
 </ol>
 <pre class="r"><code>library(dplyr)
-unique_dat &lt;- zip_dat %&gt;% distinct(NPI, Last.Name, First.Name, Graduation.year, Primary.specialty, State, .keep_all = TRUE)</code></pre>
+unique_dat &lt;- zip_dat %&gt;% distinct(NPI, Last.Name, First.Name, Graduation.year, Primary.specialty, State, zip, .keep_all = TRUE)</code></pre>
 <p>Note that the argument <code>.keep_all = TRUE</code> keeps all other variables not considered in the combination of variables that determine the uniqueness. If the combination is not distinct, the first row of values is kept, which is fine because we don’t really care as much about the other variables. For example, the organization legal name and city may vary across multiple rows for the same physician who owns a private practice and renames or moves the practice around the area but still within the same state.</p>
 <ol start="6" style="list-style-type: decimal">
 <li>separate into two datasets by hospital affiliation vs. none</li>

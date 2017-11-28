@@ -187,10 +187,10 @@ zip_dat %>% mutate(City = as.character(City), city = toupper(as.character(city))
 zip_dat %>% mutate(State = as.character(State), state = as.character(state)) %>% filter(State != state) %>% select(NPI, Zip.Code, City, city, State, state) %>% head(.,50)
 ```
 
-5. keep only one record per physician (using NPI, first/last name, graduation year, primary specialty and state just to be extra precise)
+5. keep only one record per physician (using NPI, first/last name, graduation year, primary specialty and state and zip just to be extra precise)
 ```{r}
 library(dplyr)
-unique_dat <- zip_dat %>% distinct(NPI, Last.Name, First.Name, Graduation.year, Primary.specialty, State, .keep_all = TRUE)
+unique_dat <- zip_dat %>% distinct(NPI, Last.Name, First.Name, Graduation.year, Primary.specialty, State, zip, .keep_all = TRUE)
 ```
 Note that the argument `.keep_all = TRUE` keeps all other variables not considered in the combination of variables that determine the uniqueness. If the combination is not distinct, the first row of values is kept, which is fine because we don't really care as much about the other variables. For example, the organization legal name and city may vary across multiple rows for the same physician who owns a private practice and renames or moves the practice around the area but still within the same state.
 
