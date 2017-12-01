@@ -1,0 +1,23 @@
+---
+title: "Merge"
+output: html_document
+---
+
+```{r}
+comp <- readRDS("phys.rds")
+vend <- readRDS("vendor_phys.rds")
+
+head(vend)
+head(comp)
+
+states <- data.frame(state_name = state.name, state_abb = state.abb)
+vend <- vend %>% left_join(states, by = c("Business_State_Territory" = "state_name")) 
+vend <- vend %>% mutate(state_abb = as.character(state_abb))
+
+dat <- vend %>% left_join(comp, by = c("NPI" = "NPI", "state_abb" = "State", "ZIP" = "zip"))
+
+
+saveRDS(dat, file = "dat_merge.rds")
+```
+
+
