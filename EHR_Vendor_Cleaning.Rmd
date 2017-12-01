@@ -77,7 +77,7 @@ clean_dat <- dat_mu_zmerge %>%
     (state_name != Business_State_Territory && ZIP == "54601" && Business_State_Territory == "Minnesota") |
     (state_name != Business_State_Territory && ZIP == "55905" && Business_State_Territory == "Wisconsin")
     ) %>% 
-  select(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+  select(NPI, Business_State_Territory, ZIP, Provider_Type, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 ```
 
 
@@ -170,7 +170,7 @@ mapplot %>%
 ##Save R Data
 ```{r}
 # select physician data
-dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+dat_mu_ep <- clean_dat %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
 # select hospital data
 dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
