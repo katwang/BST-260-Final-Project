@@ -26,7 +26,11 @@ dat_mu_zip <- dat_mu %>% filter(ZIP == "" | nchar(as.character(ZIP)) == 5)
 #dat_mu %>% filter(NPI == 1497083901)
 #dat_mu %>% filter(NPI == 1972809879)
 #dat_mu %>% filter(ZIP != "" & nchar(as.character(ZIP)) < 5)
+```
+* removed zipcodes for US territories (zipcodes that weren't for the 50 states or DC)
+* removed "zipcodes" that had length less than 5, ie zipcodes with characters and 3 digits
 
+```{r}
 library(zipcode)
 data("zipcode")
 dat_mu_zmerge <- dat_mu_zip %>% left_join(zipcode, by = c("ZIP" = "zip"))
@@ -34,14 +38,51 @@ dat_mu_zmerge <- dat_mu_zip %>% left_join(zipcode, by = c("ZIP" = "zip"))
 #check that states match
 states <- data.frame(state_name = state.name, state_abb = state.abb)
 
-test_mismatch <- dat_mu_zmerge %>% left_join(states, by = c("state" = "state_abb")) %>% mutate(Business_State_Territory = as.character(Business_State_Territory)) %>% filter(state_name != Business_State_Territory) %>% select(state_name, Business_State_Territory, Provider_Type)
+test_mismatch <- dat_mu_zmerge %>% left_join(states, by = c("state" = "state_abb")) %>% mutate(Business_State_Territory = as.character(Business_State_Territory)) %>% filter(state_name != Business_State_Territory)
 
-#dataset without mismatching zips
-test <- dat_mu_zmerge %>%
+# percent mismatch state
+nrow(test_mismatch)/nrow(dat_mu_zip)
+nrow(test_mismatch)/nrow(dat_mu_zmerge)
+
+# check which zips are mismatching
+test_mismatch %>% 
+  group_by(ZIP, Business_State_Territory, state_name) %>% 
+  summarize(num = n()) %>% 
+  arrange(desc(num)) %>% 
+  head(5)
+
+```
+about 4% mismatch in zipcode/states
+top 10 mismatches:
+* zipcode 51503 is in Iowa (agrees with zipcode package)/bordering Nebraska, but reported as Nebraska which is neighboring Iowa. This may be correct, so we'll keep Nebraska as reported
+* zipcode 55905 is in Minnesota, but reported state Florida is not near Minnesota. Since there is likely a typo in either zip or state, we'll remove this mismatched zip all together
+* zipcode 54601 is in Wisconsin/bordering Minnesota, but reported as Minnesota which is neighboring Wisconsin. We'll keep Minnesota as reported
+* zipcode 33331 is in Florida, which is nowhere near Ohio. Since it is unclear which was the typo, we'll delete all these mismatches
+* zipcode 55905 is in Minnesota - found it's actually Mayo Clinic (along with #2). Wisconsin and Minnesota are bordering each other, so we'll keep Wisconsin
+
+
+notes: 
+running this code test_mismatch %>% filter(ZIP == "55905")
+notice that this zipcode is incorrectly used for multiple states, possibly meaning htere were data entry/quality issues
+
+```{r}
+#dataset removing mismatching zips
+# make sure to use bus state_territory?
+clean_dat <- dat_mu_zmerge %>%
   left_join(states, by = c("state" = "state_abb")) %>% 
   mutate(Business_State_Territory = as.character(Business_State_Territory)) %>%
-  filter(state_name == Business_State_Territory)
-  
+  filter(
+    (state_name == Business_State_Territory) | 
+    (state_name != Business_State_Territory && ZIP == "51503" && Business_State_Territory == "Nebraska") |
+    (state_name != Business_State_Territory && ZIP == "54601" && Business_State_Territory == "Minnesota") |
+    (state_name != Business_State_Territory && ZIP == "55905" && Business_State_Territory == "Wisconsin")
+    ) %>% 
+  select(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+```
+
+
+old
+```{r, eval=FALSE}
 # select physician columns
 dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% select(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
