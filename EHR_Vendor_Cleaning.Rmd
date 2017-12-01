@@ -173,7 +173,7 @@ mapplot %>%
 dat_mu_ep <- clean_dat %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
 # select hospital data
-dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+dat_mu_hosp <- clean_dat %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
 
 saveRDS(dat_mu_ep, file = "vendor_phys.rds")
 saveRDS(dat_mu_hosp, file = "vendor_hosp.rds")
