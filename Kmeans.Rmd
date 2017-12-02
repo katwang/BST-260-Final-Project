@@ -1,0 +1,10 @@
+---
+title: "Kmeans"
+output: html_document
+---
+
+collapsing vendor data so each phys is one row (to do cluster analysis)
+```{r}
+#check later for matching in specialty between 2 data sets
+cluster_dat <- dat_inner %>% group_by(NPI, City, state_abb, ZIP, First.Name, Last.Name, Graduation.year, Medical.school.name, Credential, Number.of.Group.Practice.members, Primary.specialty, Gender, Vendor_Name) %>% summarize(n()) %>% group_by(NPI, City, state_abb, ZIP, First.Name, Last.Name, Graduation.year, Medical.school.name, Credential, Number.of.Group.Practice.members, Primary.specialty, Gender) %>% summarize(num_vendors = n())
+```
