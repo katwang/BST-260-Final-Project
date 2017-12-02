@@ -9,7 +9,7 @@ output: html_document
 2. clean/reduce data: decide which rows and columns to filter out
 
 ## 1. Exploratory Analysis
-Import data from `.csv` file.
+Import data from `.csv` file, downloaded from the (Medicare Data website)[https://data.medicare.gov/Physician-Compare/Physician-Compare-National-Downloadable-File/].
 ```{r}
 dat <- read.csv("Physician_Compare_National_Downloadable_File.csv")
 ```
@@ -22,11 +22,6 @@ str(dat)
 Load `tidyverse` package for data wrangling and plotting functions.
 ```{r}
 library(tidyverse)
-```
-
-Check frequency of Medicare assignment acceptance.
-```{r}
-table(dat$Professional.accepts.Medicare.Assignment)
 ```
 
 Look at the distribution of physician graduation year by physician credentials and by use of EHR.
@@ -151,7 +146,7 @@ new_dat <- dat[dat$State %in% unique(state.abb) == "TRUE" | dat$State == "DC", ]
 unique(new_dat$State)
 ```
 
-2. keep only rows with `Professional.accepts.Medicare.Assignment = 'Y'` since we are only interested in practioners who have definitely accepted medicare assignments, and we need to merge with other data that only contain those serving Medicare.
+2. (TAKE THIS OUT LATER) keep only rows with `Professional.accepts.Medicare.Assignment = 'Y'` since we are only interested in practioners who have definitely accepted medicare assignments, and we need to merge with other data that only contain those serving Medicare.
 
 ```{r}
 rm(dat) # removing previous data to save space and speed up run time
@@ -163,9 +158,10 @@ table(filtered_dat$Professional.accepts.Medicare.Assignment)
 3. key variables are NPI, last and first name, gender, credential, medical school name, grad year, prim specialty, all sec specialties,  organization legal name, num of group practice members, city, state, zip code,  hospital affiliation CCNs and LBNs,  used EHR, reported qual measures.
 
 ```{r}
+filtered_dat <- new_dat
 rm(new_dat)
 # easier to exclude than to type out all the variables to include
-select_dat <- filtered_dat %>% select(-PAC.ID, -Professional.Enrollment.ID, -Middle.Name, -Suffix, -Group.Practice.PAC.ID, -Line.1.Street.Address, -Line.2.Street.Address, -Marker.of.address.line.2.suppression, -Phone.Number, -Professional.accepts.Medicare.Assignment, -Committed.to.heart.health.through.the.Million.HeartsÂ..initiative.)
+select_dat <- filtered_dat %>% select(-PAC.ID, -Professional.Enrollment.ID, -Middle.Name, -Suffix, -Group.Practice.PAC.ID, -Line.1.Street.Address, -Line.2.Street.Address, -Marker.of.address.line.2.suppression, -Phone.Number, -Professional.accepts.Medicare.Assignment, -Reported.Quality.Measures, -Committed.to.heart.health.through.the.Million.HeartsÂ..initiative.)
 str(select_dat)
 ```
 
@@ -214,14 +210,14 @@ rm(zipcode)
 # leave out the 22401 Fredericksburg MD mismatch, fix the zip codes for Granger and Hanover.
 zip_fix <- zip_mismatch %>% ungroup() %>% 
   filter(City != 'FREDERICKSBURG') %>% 
-  mutate(zip = replace(zip, zip %in% c(43530, 20176), c(46530, 21076)))
+  mutate(zip = replace(zip, zip %in% c(43530, 20176), c(46530, 21076))) %>% 
+  select(-n)
 
 mismatch_tokeep <- zip_dat %>% 
   select(-zip) %>% # we want to replace the original wrong zip codes with the fixed zip codes
-  inner_join(zip_fix, by = c('City','State', 'city', 'state')) %>% 
-  select(-city, -state) # the original city and state entered were correct
+  inner_join(zip_fix, by = c('City','State', 'city', 'state'))
 
-zip_dat <- zip_dat %>% 
+complete_zip <- zip_dat %>%
   mutate(State = as.character(State), state = as.character(state)) %>% 
   filter(State == state) %>% # keeping only the matches
   bind_rows(mismatch_tokeep) # then add in the mismatches we wanted to keep or have fixed
@@ -230,14 +226,14 @@ zip_dat <- zip_dat %>%
 
 5. keep only one record per physician (using NPI, first/last name, primary specialty and City, State and full zip code just to be extra precise)
 ```{r}
-rm(zip_mismatch, zip_fix, mismatch_tokeep)
+rm(zip_dat, zip_mismatch, zip_fix, mismatch_tokeep)
 
-unique_dat <- zip_dat %>% distinct(NPI, Last.Name, First.Name, Primary.specialty, City, State, Zip.Code, .keep_all = TRUE)
+unique_dat <- complete_zip %>% distinct(NPI, Last.Name, First.Name, Primary.specialty, City, State, Zip.Code, .keep_all = TRUE)
 
 # there are a few physicians who have multiple primary specialty (all other distinct columns stayed constant), although the most is having two specialities and there are only 17 of these cases. We will take out primary specialty as a unique factor.
 unique_dat %>% group_by(NPI, City, State, Zip.Code) %>% summarize(n = n()) %>% arrange(desc(n)) %>% filter(n > 1)
 
-unique_dat <- unique_dat %>% distinct(NPI, Last.Name, First.Name, City, State, Zip.Code, .keep_all = TRUE)
+unique_dat <- complete_zip %>% distinct(NPI, Last.Name, First.Name, City, State, Zip.Code, .keep_all = TRUE) %>% select(-city, -state) # no longer need the city and state from zipcode package
 ```
 Note that the argument `.keep_all = TRUE` keeps all other variables not considered in the combination of variables that determine the uniqueness. If the combination is not distinct, the first row of values is kept, which is fine because we don't really care as much about the other variables. For example, the organization legal name and city may vary across multiple rows for the same physician who owns a private practice and renames or moves the practice around the area but still within the same state.
 
