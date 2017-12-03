@@ -1,0 +1,138 @@
+---
+title: "Primary and Exploratory Analysis at the Physician Level"
+author: "Eunice Yeh"
+output: html_document
+---
+
+## Understanding the Data
+
+Physician-level analyses will be performed on merged dataset of `phys.rds` and `vendor_phys.rds` created in then `Merge.Rmd` file, so that we are only analyzing the demographics of physicians whom we actually have specific vendor information on so the N is consistent between analyses. Will consider doing exploratory analysis on all physician data (including hospital-affiliated) if time permits.
+```{r setup}
+library(tidyverse)
+EHR <- readRDS("dat_merge.rds")
+
+EHR %>% arrange(NPI) %>% select(NPI, First.Name, Last.Name,Vendor_Name, EHR_Product_Name, City, state_abb, Zip.Code, Specialty, Primary.specialty,  Used.electronic.health.records) %>% head(50)
+```
+
+Each entry in this dataset is a unique EHR product used by each practitioner at a particular location. Looks like the variable `Used.electronic.health.records` is not very accurate since there are practitioners who clearly have records of EHR product use but did not answer yes (`Y`) to having used EHR. So we will rely on the fact that we have EHR information on these practitioners to indicate whether a practitioner used EHR or not in the primary analysis (?). To be able to perform physician-level analyses, I will summarize vendor and location information for each practitioner.
+
+```{r}
+phys_EHR <- EHR %>% arrange(NPI) %>% 
+  # all the characteristics considered in the group by function should already be unique at the practitioner level
+  group_by(NPI, First.Name, Last.Name, Primary.specialty, Gender, Medical.school.name, state_abb,
+           Graduation.year, Used.electronic.health.records) %>% 
+  summarize(locations = n_distinct(Zip.Code), # number of practices (based on distinct locations) a practitioner has
+            products = n_distinct(EHR_Product_Name), # number of distinct EHR products a practitioner uses
+            vendors = n_distinct(Vendor_Name), # number of distinct EHR vendors a practitioner uses
+            # states = n_distinct(state_abb), # number of states a practitioner uses EHR in
+            EHRuse = 'Y' # Indicator for EHR use (based on the fact that we have specific EHR product info for this practitioner)
+            ) %>% 
+  ungroup()
+head(phys_EHR, 50)
+
+# unique(phys_EHR$states)
+# looks like all practitioners practice within the same state, so will add state_abb into a grouping variable since it is a practitioner-level characteristic
+```
+
+
+## Exploring the Characteristics of Non-hospital-affiliated Practitioners Who Use EHR
+
+1. Check the distributions of number of practice locations, states, products, and vendors among practitioners whom we have EHR usage information on. Counts of these distributions are the number of practitioners.
+
+
+2. Explore practitioner demographics: gender, graduation year, medical school attended, primary specialty.
+
+
+
+```{r}
+phys_EHR %>% group_by(Graduation.year) %>% select(products) %>% table()
+```
+
+** ADD LATER: show N's at each point of the x-axis **
+
+```{r}
+phys_EHR %>%
+  ggplot(aes(factor(products), Graduation.year)) +
+  geom_boxplot() + 
+  facet_grid(.~Gender) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("Number of EHR Products") +
+  ylab("Graduation Year") +
+  ggtitle("Dist of Grad Year by Number of EHR Products Used by Gender")
+```
+
+
+3. Perform Association Rule Learning on all variables from the first two sections. --> check the validity of using this method if my variables are not independent from one another.
+Here, each "transaction" is a practitioner who adapted EHR as part of the Medicare EHR Incentive Program in the U.S.
+
+```{r}
+library("arulesViz")
+
+# first need to keep certain associational variables of interest and discretize them
+assoc <- phys_EHR %>% ungroup() %>% 
+  select(-NPI, -First.Name, -Last.Name, -Used.electronic.health.records, -EHRuse) %>% 
+  mutate(Gradyr = as.factor(Graduation.year),
+         State = as.factor(state_abb),
+         locations = as.factor(locations),
+         products = as.factor(products),
+         vendors = as.factor(vendors)
+         ) %>% 
+  select(-Graduation.year, -state_abb)
+View(assoc)
+
+# convert from a data frame to a transaction dataset
+assoctrans <- as(assoc, "transactions")
+
+# create rules using the apriori
+rules <- apriori(assoctrans, parameter=list(support=0.01, confidence=0.5))
+plot(rules)
+```
+
+The result is a set of 4152 association rules with generally high confidence and low support (proportion of
+transactions in the dataset which contain the itemset). Let's first trim this down a bit to more important rules (confidence > 0.8). Then check the top 30 rules with respect to the lift measure (a popular measure of rule strength) - the deviation of the support of the whole rule from the support
+expected under independence given the supports of both sides of the rule.
+
+```{r}
+subrules <- rules[quality(rules)$confidence > 0.85]
+inspect(head(sort(subrules, by ="lift"),30))
+plot(subrules, method="grouped", control=list(k=50))
+```
+The top 18 rules are showing that the strongest associations are among practitioners who use 5 EHR products across 2 different vendors in the state of Minnesota within a single practice. The next set of top rules shows us a strong association among practitioners who use 7 EHR products across 2 different vendors in the state of California within a single practice.
+
+We can visualize these top 18 rules using a directed network graph where the items are vertices and the directed edges are the rules in the direction of the antecedent (IF) to the consequent (THEN). (check this?)
+
+```{r}
+top18 <- head(sort(subrules, by ="lift"),18)
+plot(top18, method="graph") # uses items and rules as vertices connecting them with directed edges 
+plot(top18, method="graph", control=list(type="itemsets")) # uses itemsets as vertices and rules are represented by directed edges
+```
+
+Plot a parallel coordinates plot for the top 18 rules. The width of the arrows represents support and the intensity of the color represent confidence.
+```{r}
+plot(top18, method="paracoord", control=list(reorder=TRUE))
+```
+
+
+Explore these rules interactively.
+```{r}
+saveAsGraph(head(sort(rules, by="lift"),100), file="physEHR.graphml")
+```
+
+
+
+
+
+## Analyzing the Effects of __ on ___ by ___.
+
+
+## Recombining Data with Other Non-hospital-affiliated Practitioners (whom we don't have EHR product information for)
+
+Now recombine these practitioners whom we have EHR usage information for with the rest of the non-hospital affiliated practitioners whom we don't have EHR usage information for.
+
+```{r}
+# read in phys.rds
+# group by unique NPI and practitioner-level characteristics
+# summarize locations and states
+# bind rows with phys_EHR and call it phys_all
+```
+

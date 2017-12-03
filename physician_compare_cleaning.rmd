@@ -245,7 +245,7 @@ hosp <- unique_dat %>% filter(Hospital.affiliation.CCN.1 != "" | Hospital.affili
 saveRDS(hosp, file="hosp.rds")
 
 # those without any hospital affiliation
-phys <- unique_dat %>% filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5))
+phys <- unique_dat %>% filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5)) # use rgrep to remove all the hospital affiliation CCN and LBN columns later
 saveRDS(phys, file="phys.rds")
 ```
 
