@@ -1,0 +1,217 @@
+---
+title: "Maps"
+output: html_document
+---
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+
+```{r}
+library(fiftystater)
+library(RColorBrewer)
+library(tidyverse)
+data("fifty_states")
+states_map <- map_data("state")
+mapplot <- dat_mu_ep %>% filter(agrepl("Cerner", Vendor_Name)) %>% group_by(Business_State_Territory) %>% summarize(count = n()) 
+```
+
+```{r}
+age <- dat_merge %>% mutate(yrsgrad = 2016 - Graduation.year) #%>% group_by(Business_State_Territory, Graduation.year) %>% summarize(count = n())
+
+age %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(Business_State_Territory), fill = yrsgrad), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Years Since Graduation")
+```
+
+```{r}
+
+age %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_point(
+        aes(x=longitude, y=latitude, show_guide = TRUE, colour=yrsgrad), 
+        alpha=.8, size = 0.5, na.rm = T)  + 
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Years Since Graduation")
+```
+
+```{r}
+
+# #this should have been 100%?
+# useehr <- dat_merge %>% 
+#   group_by(Business_State_Territory) %>% 
+#   summarize(num = n(), used = sum(Used.electronic.health.records == "Y")) %>% 
+#   mutate(pct = used/num)
+# 
+# useehr %>% 
+#   ggplot() +
+#   geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+#   geom_map(aes(map_id = tolower(Business_State_Territory), fill = pct), map = fifty_states, color="grey50") +
+#   coord_map() +
+#   scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+#   expand_limits(x=states_map$long, y=states_map$lat) +
+#   theme_gray() +
+#   theme(axis.text = element_blank(), 
+#         axis.line = element_blank(), 
+#         axis.ticks = element_blank(), 
+#         panel.border = element_blank(), 
+#         panel.grid = element_blank(), 
+#         axis.title = element_blank(),
+#         legend.position = "bottom") +
+#   ggtitle("Percent EHR Usage")
+# 
+
+useehr <- phys %>% 
+  group_by(State) %>% 
+  summarize(num = n(), used = sum(Used.electronic.health.records == "Y")) %>% 
+  mutate(pct = used/num)
+
+useehr %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(State), fill = pct), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Percent EHR Usage")
+```
+
+```{r}
+#levels(dat_merge$Product_Setting)
+prod_setting <- dat_merge %>% 
+  filter(!is.na(Product_Setting)) %>% 
+  group_by(Business_State_Territory) %>% 
+  summarize(num = n(), 
+            amb = sum(Product_Setting == "Ambulatory"), 
+            inpat = sum(Product_Setting == "Inpatient")) %>% 
+  mutate(p_amb = amb/num, p_inpp = inpat/num)
+
+prod_setting %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(Business_State_Territory), fill = p_amb), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Product Setting = Ambulatory")
+
+prod_setting %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(Business_State_Territory), fill = p_inpp), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Product Setting = Inpatient")
+```
+
+
+```{r}
+library(ggplot2)
+sum(is.na(dat_merge$Vendor_Name))
+
+top10 <- dat_merge %>% 
+  filter(!is.na(Vendor_Name)) %>% 
+  group_by(Vendor_Name) %>% 
+  summarize(num = n()) %>% 
+  arrange(desc(num)) %>% top_n(10)
+
+vendors <- as.vector(top10$Vendor_Name)
+
+dat_merge %>% filter(Vendor_Name %in% vendors) %>% 
+  ggplot(aes(x = Vendor_Name)) + 
+  geom_bar(aes(Vendor_Name)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+length(unique(factor(dat_merge$Vendor_Name)))
+
+# percent usage of top 10
+sum(top10$num)/nrow(dat_merge)
+
+#dat_mu_ep %>% filter(n() > 5000) %>% ggplot() + geom_point(aes(x = Business_State_Territory, y = Vendor_Name, color = Vendor_Name))
+#dat_mu_ep %>% group_by(Vendor_Name) %>% filter(n() < 5000) %>% ggplot() + geom_bar(aes(Vendor_Name))
+
+pct_popvendors <- dat_merge %>% 
+  group_by(Business_State_Territory) %>% 
+  summarize(num = n(), 
+            total_v = sum(Vendor_Name %in% vendors),
+            opp = num - total_v) %>% 
+  mutate(p_vend = total_v/num, u_vend = opp/num)
+
+pct_popvendors %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(Business_State_Territory), fill = p_vend), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Usage of Top 10 Vendors")
+
+```
+
