@@ -16,10 +16,10 @@ states <- data.frame(state_name = state.name, state_abb = state.abb)
 vend <- vend %>% left_join(states, by = c("Business_State_Territory" = "state_name")) 
 vend <- vend %>% mutate(state_abb = as.character(state_abb))
 
-dat <- vend %>% left_join(comp, by = c("NPI" = "NPI", "state_abb" = "State", "ZIP" = "zip"))
+# dat <- vend %>% left_join(comp, by = c("NPI" = "NPI", "state_abb" = "State", "ZIP" = "zip"))
 dat_inner <- vend %>% inner_join(comp, by = c("NPI" = "NPI", "state_abb" = "State", "ZIP" = "zip"))
 
-saveRDS(dat, file = "dat_merge.rds")
+saveRDS(dat_inner, file = "dat_merge.rds")
 ```
 
 see if merged data has all used EHR = yes
