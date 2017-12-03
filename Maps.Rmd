@@ -23,11 +23,12 @@ library(RColorBrewer)
 library(tidyverse)
 data("fifty_states")
 states_map <- map_data("state")
-mapplot <- dat_mu_ep %>% filter(agrepl("Cerner", Vendor_Name)) %>% group_by(Business_State_Territory) %>% summarize(count = n()) 
+
+#mapplot <- dat_mu_ep %>% filter(agrepl("Cerner", Vendor_Name)) %>% group_by(Business_State_Territory) %>% summarize(count = n()) 
 ```
 
 ```{r}
-age <- dat_merge %>% mutate(yrsgrad = 2016 - Graduation.year) #%>% group_by(Business_State_Territory, Graduation.year) %>% summarize(count = n())
+age <- dat_merge %>% filter(!is.na(Graduation.year)) %>% group_by(Business_State_Territory) %>% summarize(yrsgrad = mean(2016 - Graduation.year))
 
 age %>% 
   ggplot() +
@@ -45,6 +46,7 @@ age %>%
         axis.title = element_blank(),
         legend.position = "bottom") +
   ggtitle("Years Since Graduation")
+
 ```
 
 ```{r}
@@ -127,6 +129,8 @@ prod_setting <- dat_merge %>%
             amb = sum(Product_Setting == "Ambulatory"), 
             inpat = sum(Product_Setting == "Inpatient")) %>% 
   mutate(p_amb = amb/num, p_inpp = inpat/num)
+
+# make percentage of ambulatory/inpatient overall (table)
 
 prod_setting %>% 
   ggplot() +
@@ -215,3 +219,9 @@ pct_popvendors %>%
 
 ```
 
+
+within wisconsin, new york, tennessee
+size of hosp by state
+specialty by state
+income/top vendors
+hospital density/size/region
