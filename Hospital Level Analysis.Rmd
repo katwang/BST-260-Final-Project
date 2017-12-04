@@ -1,0 +1,66 @@
+---
+title: "Hosp Level Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#inner-joined data of hosp_data and and hospital demographics data 
+#each row is a unique physician, but there can be multiple physicians working in the same hospital
+#nrow = 255548
+agg_data <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/agg_data_data.rds")
+#data aggregated on hospital level
+#each row is a uniquehospital 
+#nrow = 1746
+agg_data <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/Hosps_aggregated.rds")
+```
+
+#More Data Manipulation
+Add aggregate computed columns
+```{r}
+#RECODE Female -> 1, Male -> 0 in the gender column
+agg_data$Gender <- ifelse(agg_data$Gender=="F",1,0)
+
+full_data <- agg_data %>% 
+  group_by(Hospital.affiliation.LBN.1, City_trimmed)
+
+agg_data <- summarise(full_data, num_phys = n_distinct(NPI), gender_prop = round(mean(Gender),2), avg_grad_year = mean(Graduation.year), n_specialty =n_distinct(Primary.specialty), EHR_use = max(as.numeric(Used.electronic.health.records)), staffed_beds = mean(Staffed_beds), total_discharge = mean(Total_discharges), patient_days = mean(Patient_days), gross_patient_rev = mean(Gross_patient_revenue))
+
+agg_data$EHR_use_yn <- ifelse(agg_data$EHR_use == 1, "Y", "")
+#setwd("~Desktop/BST260-FALL2017/BST-260-Final-Project")
+#saveRDS(agg_data, "Hosps_aggregated.rds")
+```
+ 
+```{r}
+table(agg_data$EHR_use_yn)
+#Explore small-sample size hospitals with less than ten physicians
+lessTen <- agg_data[which(agg_data$num_phys < 10), ]
+table(lessTen$EHR_use_yn)
+#Why are SMALL hospitals SO MUCH more prone to use EHR? 104
+```
+
+
+```{r}
+hist(agg_data$staffed_beds, lim=c(0,500))
+boxplot(staffed_beds~EHR_use_yn,data=agg_data, 
+        xlab="EHR Use", ylab="Staffed_beds", ylim = c(0,1000))
+```
+
+```{r}
+boxplot(total_discharge~EHR_use_yn,data=agg_data, 
+        xlab="EHR Use", ylab="Total discharge")
+```
+
+```{r}
+boxplot(patient_days~EHR_use_yn,data=agg_data, 
+        xlab="EHR Use", ylab="Patient days")
+```
+
+```{r}
+boxplot(gross_patient_rev~EHR_use_yn,data=agg_data, 
+        xlab="EHR Use", ylab="Yearly gross patient revenue")
+
+```
