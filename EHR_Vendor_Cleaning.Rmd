@@ -12,13 +12,11 @@ dat_mu <- read.csv("MU_REPORT_2016.csv")
 #head(dat_mu)
 #names(dat_mu)
 
-# remove non-US states
-state_name <- c(state.name,"District of Columbia")
+# remove non-US states, appending DC to list
+state_name <- c(state.name,"District Of Columbia")
 states <- data.frame(state_name = state_name, state_abb = c(state.abb, "DC"))
 dat_mu <- dat_mu %>% filter(Business_State_Territory %in% state_name)
 
-# |   Business_State_Territory == "District Of Columbia"
-dat_mu %>% filter(Business_State_Territory == "District of Columba")
 # remove zipcodes < 5
 dat_mu_zip <- dat_mu %>% filter(ZIP == "" | nchar(as.character(ZIP)) == 5)
 
@@ -34,13 +32,13 @@ dat_mu_zip <- dat_mu %>% filter(ZIP == "" | nchar(as.character(ZIP)) == 5)
 * removed zipcodes for US territories (zipcodes that weren't for the 50 states or DC)
 * removed "zipcodes" that had length less than 5, ie zipcodes with characters and 3 digits
 
+
 ```{r}
 library(zipcode)
 data("zipcode")
 dat_mu_zmerge <- dat_mu_zip %>% left_join(zipcode, by = c("ZIP" = "zip"))
 
 #check that states match
-states <- data.frame(state_name = c(state.name,"District of Columbia"), state_abb = c(state.abb, "DC"))
 
 test_mismatch <- dat_mu_zmerge %>% left_join(states, by = c("state" = "state_abb")) %>% mutate(Business_State_Territory = as.character(Business_State_Territory)) %>% filter(state_name != Business_State_Territory)
 
@@ -70,7 +68,7 @@ top 10 mismatches:
 
 notes: 
 running this code test_mismatch %>% filter(ZIP == "55905")
-notice that this zipcode is incorrectly used for multiple states, possibly meaning htere were data entry/quality issues
+notice that this zipcode is incorrectly used for multiple states, possibly meaning there were data entry/quality issues
 
 ```{r}
 #dataset removing mismatching zips
@@ -105,7 +103,7 @@ dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% select(NPI
 ```
 
 ##Code without Zip Package
-```{r}
+```{r, eval = FALSE}
 library(dplyr)
 #https://dashboard.healthit.gov/datadashboard/documentation/ehr-products-mu-attestation-data-documentation.php
 dat_mu <- read.csv("MU_REPORT_2016.csv")
@@ -123,6 +121,20 @@ dat_mu_ep <- dat_mu_zip %>% filter(Provider_Type == "EP") %>% distinct(NPI, Busi
 
 # select hospital columns
 dat_mu_hosp <- dat_mu_zip %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)## %>% select(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+```
+
+
+
+##Save R Data
+```{r}
+# select physician data
+dat_mu_ep <- clean_dat %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+
+# select hospital data
+dat_mu_hosp <- clean_dat %>% filter(Provider_Type == "Hospital") %>% distinct(CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
+
+saveRDS(dat_mu_ep, file = "vendor_phys.rds")
+saveRDS(dat_mu_hosp, file = "vendor_hosp.rds")
 ```
 
 ##Exploratory
@@ -175,16 +187,3 @@ mapplot %>%
         legend.position = "bottom") +
   ggtitle("Test")
 ```
-
-##Save R Data
-```{r}
-# select physician data
-dat_mu_ep <- clean_dat %>% filter(Provider_Type == "EP") %>% distinct(NPI, Business_State_Territory, ZIP, Specialty, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
-
-# select hospital data
-dat_mu_hosp <- clean_dat %>% filter(Provider_Type == "Hospital") %>% distinct(NPI, CCN, Business_State_Territory, ZIP, Hospital_Type, Program_Type, Provider_Stage_Number, Vendor_Name, EHR_Product_Name, Product_Classification, Product_Setting)
-
-saveRDS(dat_mu_ep, file = "vendor_phys.rds")
-saveRDS(dat_mu_hosp, file = "vendor_hosp.rds")
-```
-
