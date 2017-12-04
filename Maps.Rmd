@@ -121,6 +121,8 @@ useehr %>%
 ```
 
 ```{r}
+library(knitr)
+library(gridExtra)
 #levels(dat_merge$Product_Setting)
 prod_setting <- dat_merge %>% 
   filter(!is.na(Product_Setting)) %>% 
@@ -130,9 +132,17 @@ prod_setting <- dat_merge %>%
             inpat = sum(Product_Setting == "Inpatient")) %>% 
   mutate(p_amb = amb/num, p_inpp = inpat/num)
 
-# make percentage of ambulatory/inpatient overall (table)
+# table for overall percentages in merge dataset
+prod_setting_overall <- dat_merge %>% 
+  summarize(total = n(), 
+            amb = sum(Product_Setting == "Ambulatory"), 
+            inpat = sum(Product_Setting == "Inpatient")) %>% 
+  mutate("Ambulatory (Outpatient)" = amb/total, Inpatient= inpat/total) %>% 
+  mutate(State = "Overall") %>% 
+  select(State, "Ambulatory (Outpatient)", Inpatient)
+prod_setting_overall %>% kable
 
-prod_setting %>% 
+ambulatory <- prod_setting %>% 
   ggplot() +
   geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
   geom_map(aes(map_id = tolower(Business_State_Territory), fill = p_amb), map = fifty_states, color="grey50") +
@@ -149,7 +159,7 @@ prod_setting %>%
         legend.position = "bottom") +
   ggtitle("Product Setting = Ambulatory")
 
-prod_setting %>% 
+inpatient <- prod_setting %>% 
   ggplot() +
   geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
   geom_map(aes(map_id = tolower(Business_State_Territory), fill = p_inpp), map = fifty_states, color="grey50") +
@@ -165,6 +175,25 @@ prod_setting %>%
         axis.title = element_blank(),
         legend.position = "bottom") +
   ggtitle("Product Setting = Inpatient")
+
+grid.arrange(ambulatory, inpatient, nrow = 1)
+
+
+# california = outlier
+cali <- dat_merge %>% 
+  filter(Business_State_Territory == "California") %>% 
+  summarize(total = n(), 
+            amb = sum(Product_Setting == "Ambulatory"), 
+            inpat = sum(Product_Setting == "Inpatient")) %>% 
+  mutate("Ambulatory (Outpatient)" = amb/total, Inpatient = inpat/total) %>% 
+  select("Ambulatory (Outpatient)", Inpatient)
+
+prod_setting_overall <- bind_rows(prod_setting_overall,
+                                  data_frame(State = "California",
+                                             "Ambulatory (Outpatient)" = cali$`Ambulatory (Outpatient)`,
+                                             Inpatient = cali$Inpatient
+                                  ))
+prod_setting_overall %>% kable
 ```
 
 
@@ -217,10 +246,26 @@ pct_popvendors %>%
         legend.position = "bottom") +
   ggtitle("Usage of Top 10 Vendors")
 
+#do analysis within wisconsin, new york, tennessee
 ```
 
+```{r}
+#most common specialties in general
+dat_merge %>% group_by(Primary.specialty) %>% summarize(num = n()) %>% arrange(desc(num))
 
-within wisconsin, new york, tennessee
+# most common state -> specialty
+specialty <- dat_merge %>% group_by(Business_State_Territory, Primary.specialty) %>% summarize(num = n()) %>% arrange(Business_State_Territory, desc(num))
+
+#check similar specialties
+dat_merge %>% filter(grepl("PSYCH", Primary.specialty)) %>% distinct(Primary.specialty)
+
+
+specialty %>% ggplot(aes(Business_State_Territory, Primary.specialty)) +
+  geom_tile(aes(fill = num))
+
+specialty %>% ggplot(aes(x = Primary.specialty, y = num, fill = Business_State_Territory)) + geom_col()
+```
+
 size of hosp by state
 specialty by state
 income/top vendors

@@ -13,8 +13,9 @@ dat_mu <- read.csv("MU_REPORT_2016.csv")
 #names(dat_mu)
 
 # remove non-US states
-states <- data.frame(state_name = c(state.name,"District of Columbia"), state_abb = c(state.abb, "DC"))
-dat_mu <- dat_mu %>% filter(Business_State_Territory %in% states$state_name)
+state_name <- c(state.name,"District of Columbia")
+states <- data.frame(state_name = state_name, state_abb = c(state.abb, "DC"))
+dat_mu <- dat_mu %>% filter(Business_State_Territory %in% state_name)
 
 # |   Business_State_Territory == "District Of Columbia"
 dat_mu %>% filter(Business_State_Territory == "District of Columba")
