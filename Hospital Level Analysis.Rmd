@@ -17,29 +17,42 @@ hosp_merged <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Pr
 #More Data Manipulation
 #Aggregate hosp_merged data at hospital level so that each row is a unique hospital 
 ```{r}
+full_data <- hosp_merged %>% 
+  group_by(Hospital.affiliation.LBN.1, City_trimmed) 
+
+#Recompute Gender and EHR-use variables into numerics
+full_data$Gender_num <- ifelse(full_data$Gender == "F", 1, 0)
+full_data$EHR_num <- ifelse(full_data$Used.electronic.health.records == "Y", 1, 0)
+
+agg_data <- summarise(full_data, num_phys = n_distinct(NPI), female_prop = round(mean(Gender_num),2), avg_grad_year = mean(Graduation.year), n_specialty =n_distinct(Primary.specialty), EHR_use = max(EHR_num), staffed_beds = mean(Staffed_beds), total_discharge = mean(Total_discharges), patient_days = mean(Patient_days), gross_patient_rev = mean(Gross_patient_revenue))
+
+table(agg_data$EHR_use)
+# Checking the if the EHR_use variable is accurate
+# EHR_y_list <- agg_data[agg_data$EHR_use == 1, ]$Hospital.affiliation.LBN.1
+# EHR_y_data <- subset(hosp_merged, Hospital.affiliation.LBN.1 %in% EHR_y_list)
+# table(EHR_y_data$Used.electronic.health.records)
+# 
+# EHR_n_hosp <- agg_data[agg_data$EHR_use == 0, ]
+# test = inner_join(hosp_merged, EHR_n_hosp, by=c("Hospital.affiliation.LBN.1" = "Hospital.affiliation.LBN.1", "City_trimmed" = "City_trimmed"))
+# table(test$Used.electronic.health.records)
+
+#RECODE Using EHR_use==1 -> Y, 0 -> ""
+agg_data$EHR_char <- ifelse(agg_data$EHR_use == 1, "Y", "Blank")
+#RECODE Years since medical school graduation
+agg_data$yrs_since_grad = 2017 - agg_data$avg_grad_year
+
+#setwd("~Desktop/BST260-FALL2017/BST-260-Final-Project")
 #data aggregated on hospital level
 #each row is a uniquehospital 
 #nrow = 1746
-full_data <- agg_data %>% 
-  group_by(Hospital.affiliation.LBN.1, City_trimmed)
-
-agg_data <- summarise(full_data, num_phys = n_distinct(NPI), gender_prop = round(mean(Gender),2), avg_grad_year = mean(Graduation.year), n_specialty =n_distinct(Primary.specialty), EHR_use = max(as.numeric(Used.electronic.health.records)), staffed_beds = mean(Staffed_beds), total_discharge = mean(Total_discharges), patient_days = mean(Patient_days), gross_patient_rev = mean(Gross_patient_revenue))
-
-agg_data$EHR_use_yn <- ifelse(agg_data$EHR_use == 1, "Y", "")
-
-#RECODE Female -> 1, Male -> 0 in the gender column
-agg_data$Gender <- ifelse(agg_data$Gender=="F",1,0)
-
-#setwd("~Desktop/BST260-FALL2017/BST-260-Final-Project")
 #saveRDS(agg_data, "Hosps_aggregated.rds")
 ```
  
 ```{r}
-table(agg_data$EHR_use_yn)
+table(agg_data$EHR_char)
 #Explore small-sample size hospitals with less than ten physicians
 lessTen <- agg_data[which(agg_data$num_phys < 10), ]
 table(lessTen$EHR_use_yn)
-#Why are SMALL hospitals SO MUCH more prone to use EHR? 104
 ```
 
 
@@ -62,5 +75,15 @@ boxplot(patient_days~EHR_use_yn,data=agg_data,
 ```{r}
 boxplot(gross_patient_rev~EHR_use_yn,data=agg_data, 
         xlab="EHR Use", ylab="Yearly gross patient revenue")
+```
 
+```{r}
+boxplot(num_phys~EHR_char ,data=agg_data, 
+        xlab="EHR Use", ylab="Number of Practitioners")
+boxplot(female_prop~EHR_char ,data=agg_data, 
+        xlab="EHR Use", ylab="Proportion of Female")
+boxplot(yrs_since_grad~EHR_char ,data=agg_data, 
+        xlab="EHR Use", ylab="Years since graduation")
+boxplot(n_specialty~EHR_char ,data=agg_data, 
+        xlab="EHR Use", ylab="Number of specialties")
 ```
