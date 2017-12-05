@@ -28,10 +28,16 @@ hosp_demo_data <- rbind(hosp_demo_data1, hosp_demo_data2)
 #1. Change the StaffedBeds,TotalDischarges, PatientDays, and Gross PatientRevenue into numeric vectors
 #Incomplete: gross_patient_revenue
 colnames(hosp_demo_data) <- c("Hospital_name", "City","Staffed_beds","Total_discharges", "Patient_days","Gross_patient_revenue", "State")
-hosp_demo_cleaned = transform(hosp_demo_data, Staffed_beds = as.numeric(gsub(",", "", Staffed_beds)), 
+hosp_demo_cleaned1 = transform(hosp_demo_data, Staffed_beds = as.numeric(gsub(",", "", Staffed_beds)), 
                  Total_discharges = as.numeric(gsub(",", "", Total_discharges)),
                  Patient_days = as.numeric(gsub(",","", Patient_days)),
                  Gross_patient_revenue = as.numeric(gsub("\\$|,", "", Gross_patient_revenue)))
+
+#if all the variables are zero, drop the hospital 
+hosp_demo_cleaned2 <- hosp_demo_cleaned1[!hosp_demo_cleaned1$Gross_patient_revenue == 0, ]
+setwd("~/Desktop/BST260-FALL2017/BST-260-Final-Project")
+#run this later
+saveRDS(hosp_demo_cleaned2, file="hosp_demo_full.rds")
 ```
 
 #Merge the hospital demographics data with the hosp_data
