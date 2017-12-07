@@ -37,11 +37,14 @@ hosp_demo_cleaned1 = transform(hosp_demo_data, Staffed_beds = as.numeric(gsub(",
 hosp_demo_cleaned2 <- hosp_demo_cleaned1[!hosp_demo_cleaned1$Gross_patient_revenue == 0, ]
 setwd("~/Desktop/BST260-FALL2017/BST-260-Final-Project")
 #run this later
-saveRDS(hosp_demo_cleaned2, file="hosp_demo_full.rds")
+#saveRDS(hosp_demo_cleaned2, file="hosp_demo_full.rds")
 ```
 
-#Merge the hospital demographics data with the hosp_data
+#Merge the cleanedhospital demographics data with the hosp_data
 ```{r}
+#assign the most up-to-date cleaned hosp_demo data to "hosp_demo_cleaned"
+hosp_demo_cleaned <- hosp_demo_cleaned2
+
 #Use hospital name and city to merge
 hosp_demo_cleaned$Hospital_name <- toupper(hosp_demo_cleaned$Hospital_name)
 hosp_demo_cleaned$City_trimmed <- toupper(str_trim(hosp_demo_cleaned$City))
@@ -56,7 +59,7 @@ joined_df <- inner_join(hosp_data, hosp_demo_cleaned, by=c("Hospital.affiliation
 ##Future discussion: what kind of join? Unique hospitals
 ##Number of physicians per hospital, gender prop, average grad year, most populat specialty, number of speciaties
 #Remove mu_report to git push 
-setwd("~Desktop/BST260-FALL2017/BST-260-Final-Project")
+setwd("~/Desktop/BST260-FALL2017/BST-260-Final-Project")
 saveRDS(joined_df, "Hosp_merged_data.rds")
 ```
 

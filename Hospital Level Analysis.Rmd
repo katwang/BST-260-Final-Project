@@ -1,5 +1,5 @@
 ---
-title: "Hosp Level Analysis"
+title: "Hospital-Level Analysis"
 output: html_document
 ---
 
@@ -8,6 +8,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(broom)
 #inner-joined data of hosp_data and and hospital demographics data 
 #each row is a unique physician, but there can be multiple physicians working in the same hospital
 #nrow = 269663
@@ -41,45 +45,32 @@ agg_data$EHR_char <- ifelse(agg_data$EHR_use == 1, "Y", "Blank")
 #RECODE Years since medical school graduation
 agg_data$yrs_since_grad = 2017 - agg_data$avg_grad_year
 
-#setwd("~Desktop/BST260-FALL2017/BST-260-Final-Project")
+table(agg_data$EHR_use)
+which(is.na(agg_data$gross_patient_rev))
 #data aggregated on hospital level
 #each row is a uniquehospital 
 #nrow = 1746
+#setwd("~Desktop/BST260-FALL2017/BST-260-Final-Project")
 #saveRDS(agg_data, "Hosps_aggregated.rds")
 ```
  
 ```{r}
-table(agg_data$EHR_char)
 #Explore small-sample size hospitals with less than ten physicians
 lessTen <- agg_data[which(agg_data$num_phys < 10), ]
-table(lessTen$EHR_use_yn)
-
+table(lessTen$EHR_char)
 agg_data[agg_data$gross_patient_rev == 0, ]
 ```
 
-
+#Exploratory Analysis: Box Plots
 ```{r}
-hist(agg_data$staffed_beds, lim=c(0,500))
-boxplot(staffed_beds~EHR_use_yn,data=agg_data, 
+boxplot(staffed_beds~EHR_char,data=agg_data, 
         xlab="EHR Use", ylab="Staffed_beds", ylim = c(0,1000))
-```
-
-```{r}
-boxplot(total_discharge~EHR_use_yn,data=agg_data, 
+boxplot(total_discharge~EHR_char,data=agg_data, 
         xlab="EHR Use", ylab="Total discharge")
-```
-
-```{r}
-boxplot(patient_days~EHR_use_yn,data=agg_data, 
+boxplot(patient_days~EHR_char,data=agg_data, 
         xlab="EHR Use", ylab="Patient days")
-```
-
-```{r}
-boxplot(gross_patient_rev~EHR_use_yn,data=agg_data, 
+boxplot(gross_patient_rev~EHR_char,data=agg_data, 
         xlab="EHR Use", ylab="Yearly gross patient revenue")
-```
-
-```{r}
 boxplot(num_phys~EHR_char ,data=agg_data, 
         xlab="EHR Use", ylab="Number of Practitioners")
 boxplot(female_prop~EHR_char ,data=agg_data, 
@@ -89,7 +80,13 @@ boxplot(yrs_since_grad~EHR_char ,data=agg_data,
 boxplot(n_specialty~EHR_char ,data=agg_data, 
         xlab="EHR Use", ylab="Number of specialties")
 ```
+
+#Check for correlations
 ```{r}
+#Load necesarry libraries 
+library(RColorBrewer)
+library(car)
+
 #Check for correlations
 X <- c("num_phys", "female_prop", "avg_grad_year", "n_specialty", "staffed_beds", "total_discharge", "patient_days", "gross_patient_rev")
 cor(agg_data$num_phys, agg_data$EHR_use)
@@ -101,12 +98,106 @@ cor(agg_data$total_discharge, agg_data$EHR_use)
 cor(agg_data$patient_days, agg_data$EHR_use)
 cor(agg_data$gross_patient_rev, agg_data$EHR_use)
 
-# Packages
-library(RColorBrewer)
-library(car)
-
-# Make the plot
+#Correlation Matrix
 my_colors <- brewer.pal(nlevels(as.factor(agg_data$EHR_char)), "Set1")
 scatterplotMatrix(~num_phys+female_prop+yrs_since_grad+staffed_beds+gross_patient_rev|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
 
+
+#Variables that are not normally distributed are logged: num_phys, staffed_bed, gross_patient_rev
+agg_data$num_phys_log <- log(agg_data$num_phys)
+agg_data$staffed_beds_log <- log(agg_data$staffed_beds)
+agg_data$gross_patient_rev_log <- log(agg_data$gross_patient_rev)
+agg_data$total_discharge_log <- log(agg_data$total_discharge)
+agg_data$patient_days_log<- log(agg_data$patient_days)
+
+
+
+#Noticeable correlations(more than 0.3): 
+#EHR_use: EHR_use - num_phys_log, EHR_use-n_specialty, EHR_use-staffed_beds_log, EHR_use-gross_patient_rev_log
+#Confounding (correlation over 0.7):
+#num_phys_log-n_specialty/staffed_Bed _log/total_discharge/gross_patient_rev
+#n_specialty-staffed_beds_log/ total_discharge/patient_days/gross_patient_rev_log
+#staffed_bed_log-total_discharge, patient_days,gross_patient_rev_log
+#total_discharge-patient_days, gross_patient_rev
+#patient_days-gross_patient_rev_log
+#Conclusion: Confounding factor is the size of the hospital that influences all number of physicians, number of specialties, number of staffed beds, total discharges, gross patient revenue
+#Potential highest confounding factors are number of physicians-number of speciaties, staffed_beds - gross patient revenue, total discharge - patient days
+
+agg_data_cor <- agg_data[, c("EHR_use", "num_phys_log","female_prop","n_specialty","staffed_beds_log","total_discharge","patient_days", "gross_patient_rev_log","yrs_since_grad")]
+round(cor(agg_data_cor), 2)
+
+#*Years since graduation comes out as NAs, so pull out yrs_since_grad correlation with only complete observations
+round(cor(agg_data_cor, use="complete.obs"), 2)
+#conclusion: weak negative correlation with all variables with all but female between -0.3 and 0. 
+#strongest correlation is thefemale proportion, with is -0.44
+
+#Correlation Matrix with logged variables
+scatterplotMatrix(~num_phys_log+female_prop+yrs_since_grad+staffed_beds_log
+                  +gross_patient_rev_log|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
+
+```
+
+```{r}
+#How about stratified hospital sizes, and see EHR_use proportion?  
+#Stratify with two most strongly correlated variables (number of physicians(corr=0.55), and gross_patient_rev_log(corr=0.45))
+hist(agg_data$num_phys)
+hist(agg_data$gross_patient_rev)
+
+agg_data$num_phys_grp = cut(agg_data$num_phys, quantile(agg_data$num_phys, prob = seq(0, 1, .1)), include.lowest = TRUE)
+agg_data$gpr_grp = cut(agg_data$gross_patient_rev, quantile(agg_data$gross_patient_rev, prob = seq(0, 1, .1)), include.lowest = TRUE)
+#correlation between number of physicians and gross patientrevenue 
+plot(agg_data$num_phys_log, agg_data$gross_patient_rev_log)
+
+#Table: counts in num_phys and gpr groups
+table(agg_data$num_phys_grp, agg_data$gpr_grp)
+#Heatmap: num_phys, gross_patient_rev, EHR_use proportion
+ggplot(data = agg_data, aes(x = num_phys_grp, y = gpr_grp)) +
+  geom_tile(aes(fill = EHR_use)) 
+
+filter_var = "patient_days"
+agg_data %>%
+    group_by(gpr_grp) %>%
+    do(tidy(glm(EHR_use ~ num_phys + staffed_beds_log + total_discharge + patient_days, data = .))) %>%
+    filter(term==filter_var)
+
+#When stratified by gross patient revenue, NONE appears significant but NUMBER OF PHYSICIANS
+res$estimate
+```
+
+#Making Models
+```{r}
+library(caret)
+Train <- createDataPartition(agg_data$EHR_use, p=0.6, list=FALSE)
+training <- agg_data[Train, ]
+testing <- agg_data[-Train, ]
+
+glm1 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + staffed_beds_log + total_discharge_log + patient_days_log, data=training, family = "binomial")
+summary(glm1)
+
+#TEST GLM1 
+p_hat_logit <- predict(glm1, newdata = testing, type="response")
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
+confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
+
+#TEST GLM2
+glm2 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + total_discharge_log , data=training, family = "binomial")
+#TEST GLM2 
+
+p_hat_logit <- predict(glm2, newdata = testing, type="response")
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
+confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
+
+anova(glm1, glm2, test ="Chisq")
+#We should use GLm2 
+
+#TEST GLM3
+glm3 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + gross_patient_rev_log*num_phys_log + total_discharge_log , data=training, family = "binomial")
+summary(glm3)
+
+p_hat_logit <- predict(glm3, newdata = testing, type="response")
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
+confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
+anova(glm2, glm3, test ="Chisq")
+
+##*Write a funciton for confusionMatrix
 ```
