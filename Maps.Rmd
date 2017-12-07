@@ -21,6 +21,7 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 library(fiftystater)
 library(RColorBrewer)
 library(tidyverse)
+library(ggplot2)
 data("fifty_states")
 states_map <- map_data("state")
 
@@ -50,8 +51,10 @@ age %>%
 ```
 
 ```{r}
-
-age %>% 
+dat_merge %>% 
+  filter(!is.na(Graduation.year)) %>% 
+  group_by(ZIP) %>% 
+  summarize(yrsgrad = mean(2016 - Graduation.year)) %>% 
   ggplot() +
   geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
   geom_point(
@@ -198,7 +201,6 @@ prod_setting_overall %>% kable
 
 
 ```{r}
-library(ggplot2)
 sum(is.na(dat_merge$Vendor_Name))
 
 top10 <- dat_merge %>% 
@@ -264,6 +266,113 @@ specialty %>% ggplot(aes(Business_State_Territory, Primary.specialty)) +
   geom_tile(aes(fill = num))
 
 specialty %>% ggplot(aes(x = Primary.specialty, y = num, fill = Business_State_Territory)) + geom_col()
+```
+
+```{r}
+#load hosp data & clean
+#hosp <- readRDS("~/Desktop/BST 260/BST-260-Final-Project/Hosp_merged_data.rds")
+hosp$State.y[hosp$State.y == "ak_t"] <-"ak"
+state_name <- c(state.name,"District Of Columbia")
+states <- data.frame(state_name = state_name, state_abb = c(state.abb, "DC"))
+hosp <- hosp %>% mutate(State.y = toupper(State.y)) %>% left_join(states, by = c("State.y" = "state_abb"))
+```
+
+```{r}
+#take state pop into consideration?
+beds <- hosp %>% 
+  group_by(state_name) %>% 
+  summarize(beds = mean(Staffed_beds)) 
+
+beds %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(state_name), fill = beds), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Hosp Beds")
+```
+
+
+```{r}
+# patient days
+hosp %>% 
+  group_by(state_name) %>% 
+  summarize(patient = mean(Patient_days)) %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(state_name), fill = patient), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Across states, mean patient days per hospital on average")
+```
+
+```{r}
+#total discharges
+hosp %>% 
+  group_by(state_name) %>% 
+  summarize(discharges = mean(Total_discharges)) %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(state_name), fill = discharges), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Across states, mean discharges days per hospital on average")
+```
+
+```{r}
+#avg revenue per discharge
+
+# need to fix - 0's in data
+revenue <- hosp %>% 
+  mutate(per = Gross_patient_revenue/Total_discharges)# %>% 
+  # group_by(State.y) %>% 
+  # summarize(rev = mean(per))
+
+hosp %>% filter(Gross_patient_revenue==0)
+
+revenue %>% 
+  ggplot() +
+  geom_map(aes(map_id = id), data = fifty_states, map = fifty_states, color="grey50", fill="grey90") +
+  geom_map(aes(map_id = tolower(state_name), fill = rev), map = fifty_states, color="grey50") +
+  coord_map() +
+  scale_fill_gradientn(colors = brewer.pal(6, "RdYlGn")) +
+  expand_limits(x=states_map$long, y=states_map$lat) +
+  theme_gray() +
+  theme(axis.text = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(), 
+        panel.border = element_blank(), 
+        panel.grid = element_blank(), 
+        axis.title = element_blank(),
+        legend.position = "bottom") +
+  ggtitle("Across states, average revenue per discharge")
 ```
 
 size of hosp by state
