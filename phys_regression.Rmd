@@ -1,0 +1,152 @@
+---
+title: "Physician-level Effects Logistic Model"
+author: "Eunice Yeh"
+date: "December 8, 2017"
+output: html_document
+---
+
+# data
+load all phys data and clean up real quick
+```{r}
+library(tidyverse)
+dat <- readRDS("phys_all.rds")
+data("state")
+
+EPs <- dat %>% filter(st %in% c(state.abb, "DC") & hosp_afl_1 == '') %>% 
+  filter(gndr %in% c("F", "M") & !is.na(grd_yr)) %>% 
+  mutate(yrs_grd = 2016 - as.integer(grd_yr),
+         cred = case_when(cred == '' ~ 'NA',
+                          TRUE ~ as.character(cred)),
+         cred = as.factor(cred),
+         ehr = case_when(ehr == 'Y' ~ 1,
+                         ehr == '' ~ 0),
+         ehr = as.factor(ehr)) %>% 
+  select(-hosp_afl_1, -hosp_afl_lbn_1, -frst_nm) %>% 
+  arrange(desc(ehr)) %>% 
+  distinct(npi, .keep_all = TRUE)
+
+# calculate the number of practices for each physician
+SL <- dat %>% group_by(npi) %>% summarise(locations = n_distinct(zip))
+
+EPs <- left_join(EPs, SL, by="npi")
+
+summary(EPs)
+```
+
+this EPs data now contains only physicians who are not affiliated with any hospital and within the 51 US States where each row is unique to the physician.
+
+
+# exploratory
+
+```{r}
+library(GGally)
+library(reshape2)
+library(lme4)
+library(lattice)
+library(boot)
+library(parallel)
+library(compiler)
+```
+
+
+1. visualize the relationships between years since graduation and gender.
+```{r}
+# generic distribution comparisons
+EPs %>% ggpairs(columns = c("gndr", "yrs_grd", "locations"))
+
+# violin plots with jittering for years since graduation by gender
+EPs %>% melt(id.vars="gndr", measure.vars="yrs_grd") %>% 
+  ggplot(aes(gndr, value)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0.75) +
+  facet_grid(variable ~ .) +
+  scale_y_sqrt()
+
+# violin plots with jittering for locations by gender
+EPs %>% melt(id.vars="gndr", measure.vars="locations") %>% 
+  ggplot(aes(gndr, value)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0.75) +
+  facet_grid(variable ~ .) +
+  scale_y_log10()
+
+```
+
+in the grand scheme of things, i think it's safe to say that gender is pretty independent of years since graduation. so we should be able to add them into the model together without them influencing each other's effects. Also, the distribution of years since graduation is pretty skewed, we used a square root scale so that's why the kernel density curves in the violin plots look more symmetric than the histograms from `ggpairs`. The actual raw values of the years since graduation were not square-root transformed though so we can see and intepret the actual years rather than the square root of the years.
+
+update: i later added in the number of locations just because it's another continuous variable we can look at, but really most physicians in the data have only one practice location and then there's a jump to a few physicians who have >300 unique zip codes of all their practices. this distribution is seen equally across genders and years since graduation, so clearly very independent of the two other variables - so it can be safely added to the model. but i'm just afraid that this information is already not so valid? it's really more of a categorical variable.
+
+2. credentials is one of the categorical variables with the least number of levels, let's see if we can add this into the model too. first check the relationship between years since graduation and credentials.
+```{r}
+EPs %>% mutate(cred = reorder(cred, yrs_grd)) %>% 
+  ggplot(aes(cred, yrs_grd)) +
+  stat_sum(aes(size = ..n.., group = 1)) +
+  scale_size_area(max_size = 10)
+```
+the distribution of years since graduation looks pretty consistent across different levels of credentials, except for AA due to small sample size and NA due to disproportionally large sample size. "NA" is unknown credential and unfortunately the majority of our physicians fell in that category (perhaps many people skip the credentials field because it's not a required field or unnecessary if the dataset is already going to be mostly doctors?) anyway, this tells us that we probably shouldn't use credentials as a variable since it's mostly missing (~75% NAs).
+
+3. now look at the relationship of each of these effects of interest with the outcome of EHR use
+
+```{r}
+# gender and years since graduation and EHR use
+EPs %>% ggpairs(columns = c("gndr", "yrs_grd", "ehr"))
+
+# years since graduation by EHR use
+EPs %>% ggplot(aes(ehr, yrs_grd)) +
+  stat_sum(aes(size = ..n.., group = 1)) +
+  scale_size_area(max_size = 10)
+
+# years since graduation by EHR use
+EPs %>% melt(id.vars="ehr", measure.vars="yrs_grd") %>% 
+  ggplot(aes(ehr, value)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0.75) +
+  facet_grid(variable ~ .) +
+  scale_y_sqrt()
+```
+a general observation is that there are proportionally more physicians in our data who have not used EHR. so we already have an imbalance in sample size between the two groups. but overall, our sample size is still large enough.
+
+4. although we can't add the other categorical variables with too many levels to the model, we will still explore the high-level relationship between these categorical variables with ehr use. here's a correlation matrix of numeric levels of med school and primary specialty with ehr use.
+
+```{r}
+library(sjPlot)
+
+EPs %>% select(ehr, med_sch, pri_spec) %>% 
+  mutate(ehr = as.integer(ehr), med_sch = as.integer(med_sch), pri_spec = as.integer(pri_spec)) %>% 
+  sjp.corr()
+
+```
+
+the correlation coefficients are not very high...maybe they're not interesting after all?
+
+
+# logistic regression model: effects of physicial-level demographics on the use of EHR
+
+```{r}
+# fit the model
+model <- glm(ehr ~ gndr + yrs_grd + locations, data = EPs, family = binomial)
+summary(model)
+
+# confidence intervals with log-likelihood
+confint(model)
+```
+
+table of 95% confidence intervals
+```{r}
+# CIs using standard errors
+confint.default(model)
+```
+
+table of odds ratios
+```{r}
+exp(coef(model))
+```
+
+table of odds ratios with 95% CI
+```{r}
+exp(cbind(OR = coef(model), confint(model)))
+```
+
+
+should we do a predicted probability of ehr use at each level of gender, years since graduation, and location?
+
