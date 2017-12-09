@@ -62,6 +62,8 @@ vt <- read_html("https://www.ahd.com/states/hospital_VT.html") %>% html_nodes("t
 wa <- read_html("https://www.ahd.com/states/hospital_WA.html") %>% html_nodes("table") %>% .[[2]] %>% html_table()
 wi <- read_html("https://www.ahd.com/states/hospital_WI.html") %>% html_nodes("table") %>% .[[2]] %>% html_table()
 wy <- read_html("https://www.ahd.com/states/hospital_WY.html") %>% html_nodes("table") %>% .[[2]] %>% html_table()
+mt <- read_html("https://www.ahd.com/states/hospital_MT.html") %>% html_nodes("table") %>% .[[2]] %>% html_table()
+wv <- read_html("https://www.ahd.com/states/hospital_WV.html") %>% html_nodes("table") %>% .[[2]] %>% html_table()
 
 ###Converting tables into data frames than row-bind into one data
 #"ak_df" <- as.data.frame.matrix(ak_t) 

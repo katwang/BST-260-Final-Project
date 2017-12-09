@@ -1,6 +1,8 @@
 ---
 title: "Hospital-Level Analysis"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -14,12 +16,15 @@ library(tidyverse)
 library(broom)
 library(RColorBrewer)
 library(car)
+library(caret)
 ```
 
 #Load data
 We merged subset of CMS datast that is composed only of practitioners who are affliated with hospitals and a dataset of hospitals in the United States in the American Hospital Directory (AHD). The two datasets were inner-joined based on NPI and the City variables. Each row in the "hosp_merged" dataset is a practitioner, and if there are multiple practitioners in one hospital, he/she appears in multiple rows. While merging, some of the hospitals that has zero gross patient revenue in the AHD data were removed from the data. Number of observations in the final dataset was 266,953.   
 ```{r}
+hosp_demo <-readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/hosp_demo_full.rds")
 hosp_merged <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/Hosp_merged_data.rds")
+table(hosp_merged$State.x)
 ```
 
 #Aggregate data into hospital-level
@@ -27,7 +32,7 @@ We now aggregate 'hosp_merged' data at hospital level so that each row is a uniq
 ```{r}
 #Group hosp_merged data by "Hospital.affiliation.LBN.1," which is hospital name, and "City_trimmed," which is cleaned-up city name. 
 full_data <- hosp_merged %>% 
-  group_by(Hospital.affiliation.LBN.1, City_trimmed) 
+  group_by(Hospital.affiliation.LBN.1, City_trimmed)
 
 #Recompute Gender and EHR-use variables into numerics
 full_data$Gender_num <- ifelse(full_data$Gender == "F", 1, 0)
@@ -160,7 +165,6 @@ round(cor(agg_data_cor, use="complete.obs"), 2)
 #Correlation Matrix with logged variables
 scatterplotMatrix(~num_phys_log+female_prop+yrs_since_grad+staffed_beds_log
                   +gross_patient_rev_log|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
-
 ```
 
 #Stratification
@@ -228,7 +232,7 @@ testing <- agg_data[-Train, ]
 
 ```{r}
 #TEST GLM1 
-glm1 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + staffed_beds_log + total_discharge_log + patient_days_log, data=training, family = "binomial")
+glm1 <- glm(EHR_use ~ gross_patient_rev_log + staffed_beds_log + total_discharge_log + patient_days_log +staffed_beds_log:gross_patient_rev_log + total_discharge_log:patient_days_log, data=training, family = "binomial")
 summary(glm1)
 
 
@@ -236,39 +240,80 @@ p_hat_logit <- predict(glm1, newdata = testing, type="response")
 y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
 confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
 
-res <- tidy(glm1, conf.int = TRUE) # `fit` is from 1A
-res
-
 #TEST GLM2
-glm2 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + total_discharge_log , data=training, family = "binomial")
+#WE WON'T use this model because num_phys is not very reliable
+#BUT the model has the best fit. 
+glm2 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + gross_patient_rev_log*num_phys_log, data=training, family = "binomial")
+summary(glm2)
 
 p_hat_logit <- predict(glm2, newdata = testing, type="response")
 y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
 confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
 
 anova(glm1, glm2, test ="Chisq")
-#We should use GLm2 
 
 #TEST GLM3
-glm3 <- glm(EHR_use ~ gross_patient_rev_log + num_phys_log + gross_patient_rev_log*num_phys_log + total_discharge_log, data=training, family = "binomial")
+glm3 <- glm(EHR_use ~ gross_patient_rev_log + staffed_beds_log  + gross_patient_rev_log*staffed_beds_log, data=training, family = "binomial")
 summary(glm3)
 
 p_hat_logit <- predict(glm3, newdata = testing, type="response")
 y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
 confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
-anova(glm2, glm3, test ="Chisq")
-```
+anova(glm1, glm3, test ="Chisq")
 
+```
+#Model Estimate Plots
 ```{r}
 ##MODEL ESTIMATE PLOTS
-glm4 <- glm(EHR_use ~ num_phys_log + staffed_beds_log + total_discharge_log + patient_days_log, data=training, family = "binomial")
-tidy(glm4)
 agg_data %>%
   group_by(gpr_grp) %>%
-  do(tidy(glm4)) %>%
+  do(tidy(glm3)) %>%
   #filter(!grepl("Intercept", term))%>%
   ggplot(aes(gpr_grp, estimate, group = term, col = term)) +
   geom_line() + 
   geom_point()
+```
 
+```{r}
+#KATHERINE NEVERMIND THE BELOW THINGS
+#Ribbon plots
+# newdata1$rankP <- predict(glm3, newdata = agg_data, type = "response")
+# newdata1
+# 
+# newdata2 <- with(mydata, data.frame(gre = rep(seq(from = 200, to = 800, length.out = 100),
+#     4), gpa = mean(gpa), rank = factor(rep(1:4, each = 100))))
+# 
+# fit <- predict(glm3, newdata = agg_data, type = "link", se = TRUE)$fit
+# se.fit <- predict(glm3, newdata = agg_data, type = "link", se = TRUE)$se.fit
+# #$fit
+# #$se.fit
+# newdata3 <- cbind(agg_data, fit)[1:10,]
+# newdata3 <- within(new_data3, {
+#     PredictedProb <- plogis(glm3)
+#     LL <- plogis(fit - (1.96 * se.fit))
+#     UL <- plogis(fit + (1.96 * se.fit))
+# })
+# 
+# ## view first few rows of final dataset
+# head(newdata3)
+# 
+# ggplot(newdata3, aes(x = gre, y = PredictedProb)) + geom_ribbon(aes(ymin = LL,
+#     ymax = UL, fill = rank), alpha = 0.2) + geom_line(aes(colour = rank),
+#     size = 1)
+```
+#Calculate odds ratio and CI
+Our final model is glm3 with two variables: staffed beds and gross revenue. 
+```{r}
+#confidence intervals with log-likelihood
+confint(glm3)
+#table of 95% confidence intervals
+
+#CIs using standard errors
+confint.default(glm3)
+
+#table of odds ratios
+exp(coef(glm3))
+
+#table of odds ratios with 95% CI
+exp(cbind(OR = coef(glm3), confint(glm3)))
 ```
