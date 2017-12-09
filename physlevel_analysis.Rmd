@@ -4,11 +4,146 @@ author: "Eunice Yeh"
 output: html_document
 ---
 
-## Understanding the Data
+Since practitioners who are affiliated with a hospital may not have a choice in using EHR or not, we will exclude these from our analysis population, which is now just the practitioners who enrolled in the Medicare Incentive Program who are not affiliated with any hospital, which come from the dataset we cleaned earlier: `phys.rds`.
+
+```{r}
+library(tidyverse)
+phys <- readRDS("phys.rds")
+```
+
+## Primary Analysis: Effects of Practitioner Demographics on the Use of EHR
+
+We need to get a unique row per practitioner in order to fit a logistic regression model on practitioner-level demographics and EHR use.
+```{r}
+reg <- phys %>% 
+  group_by(NPI, First.Name, Last.Name, Primary.specialty, Gender, Medical.school.name, State,
+           Graduation.year, Used.electronic.health.records) %>% 
+  summarize(locations = n_distinct(Zip.Code)) #%>%  # the number of practices based on distinct locations
+  mutate(EHRuse = case_when(Used.electronic.health.records == 'Y' ~ 1, # EHR use = 1
+                            Used.electronic.health.records == '' ~ 0)) # No response to EHR use = 0
+test <- phys %>% group_by(NPI) %>% summarize(nfirst = n_distinct(First.Name), 
+                                             nlast = n_distinct(Last.Name), 
+                                             nprim = n_distinct(Primary.specialty), 
+                                             ngend = n_distinct(Gender), 
+                                             nmed = n_distinct(Medical.school.name), 
+                                             nstate = n_distinct(State), 
+                                             ngrad = n_distinct(Graduation.year), 
+                                             nehr = n_distinct(Used.electronic.health.records))
+# for now do this:
+reg <- phys %>% distinct(NPI, .keep_all = TRUE)
+```
+
+** describe some math to explain the theory of our model here **
+
+FIRST look at relationships between exposure variables
+
+```{r}
+library("arulesViz")
+
+# first need to keep certain associational variables of interest and discretize them
+corr <- reg %>% ungroup() %>% filter(Medical.school.name != "OTHER") %>% 
+  select(Gender, Graduation.year, Primary.specialty, State) %>% 
+  mutate(gradyr = as.factor(Graduation.year),
+         state = as.factor(State)
+         ) %>% 
+  select(-Graduation.year, -State)
+View(corr)
+
+# convert from a data frame to a transaction dataset
+corrt <- as(corr, "transactions")
+
+# create rules using the apriori
+rules <- apriori(corrt, parameter=list(support=0.01, confidence=0.5))
+plot(rules)
+```
+
+
+```{r}
+subrules <- rules[quality(rules)$confidence > 0.85]
+inspect(head(sort(subrules, by ="lift"),30))
+plot(subrules, method="grouped", control=list(k=50))
+```
+
+This is telling us that graduation year really isn't very interesting, state is also not as interesting as medical school, primary specialty, and gender. But then we need to choose only either medical school or primary specialty beacusethey are theoretically highly correlated - you would only go to an optometry school if you want to specailize in optometry.
+
+
+So this boils down to this model:
+
+consider drawing a dag in R?
+EHRuse = grad year + specialty + (gradyr x gender) + (specialty x gender)
+
+logistic regression models:
+$$
+1. EHR = gradyr  \\
+2. EHR = gradyr + specialty \\
+3. EHR = gradyr + specialty + gender \\
+4. EHR = gradyr + gradyr*gender \\
+5. EHR = specialty \\
+6. EHR = specialty + specialty*gender \\
+7. EHR = gradyr + specialty + gradyr*gender + specialty*gender
+$$
+
+
+things to fix:
+- calculate a new continuous variable: years since graduation (2016 - Graduation.year)
+- stratify Graduation.year into tenth-tiles for the associative learning
+- how to subset to primary specialty? (mental health, oncology, optometry, primary care)
+
+
+
+
+```{r}
+fit <- reg %>% filter(Gender !="U" & !is.na(Graduation.year) & Medical.school.name != "OTHER") %>% 
+  mutate(EHRuse = case_when(Used.electronic.health.records == 'Y' ~ 1,
+                            TRUE ~ 0),
+         gradyr = as.factor(Graduation.year))
+model1 <- glm(EHRuse ~ Gender, data = fit, family = binomial)
+summary(model1)
+# model2 <- glm(EHRuse ~ Graduation.year + Gender + Graduation.year:Gender, data = fit, family = binomial) # same thing as below
+model2 <- glm(EHRuse ~ Graduation.year*Gender, data = fit, family = binomial)
+summary(model2)
+model3 <- glm(EHRuse ~ Primary.specialty, data = fit, family = binomial)
+summary(model3)
+```
+
+
+
+Let's explore the relationship between med school amd primary specialty stratified by gender.
+
+```{r}
+reg %>% filter(Medical.school.name != "OTHER" & Gender !="U") %>%
+  # mutate(BB_per_game = BB/G, R_per_game = R/G, HR_per_game = HR/G, HR_strata = cut(HR_per_game, breaks = quantile(HR_per_game, probs = seq(0, 1, 0.1)))) %>%  #, labels = FALSE)) %>% 
+  # filter(!is.na(HR_strata)) %>% 
+  group_by(Gender) %>% 
+  select(Primary.specialty, Graduation.year, Gender) %>% 
+  ggplot(aes(as.integer(Primary.specialty), Graduation.year)) +  
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  facet_wrap(~Gender) +
+  xlab("Primary Specialty")+
+  ylab("Graduation Year") +
+  ggtitle("Relationship between Primary Specialty and Graduation Year stratified by Gender")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Exploratory Analysis: Demographics of Practitioners Among Those Who Use EHR (and whom we have vendor information on)
 
 Physician-level analyses will be performed on merged dataset of `phys.rds` and `vendor_phys.rds` created in then `Merge.Rmd` file, so that we are only analyzing the demographics of physicians whom we actually have specific vendor information on so the N is consistent between analyses. Will consider doing exploratory analysis on all physician data (including hospital-affiliated) if time permits.
-```{r setup}
-library(tidyverse)
+```{r}
 EHR <- readRDS("dat_merge.rds")
 
 EHR %>% arrange(NPI) %>% select(NPI, First.Name, Last.Name,Vendor_Name, EHR_Product_Name, City, state_abb, Zip.Code, Specialty, Primary.specialty,  Used.electronic.health.records) %>% head(50)
@@ -39,6 +174,7 @@ head(phys_EHR, 50)
 
 1. Check the distributions of number of practice locations, states, products, and vendors among practitioners whom we have EHR usage information on. Counts of these distributions are the number of practitioners.
 
+consider keeping vendor names so we can look at if the majority of the people are using only 1 vendor, is it beacuse they're one of the big vendors? and for those who have to use more than one vendor, is it because they're using smaller vendors?
 
 2. Explore practitioner demographics: gender, graduation year, medical school attended, primary specialty.
 
@@ -115,24 +251,6 @@ plot(top18, method="paracoord", control=list(reorder=TRUE))
 
 Explore these rules interactively.
 ```{r}
-saveAsGraph(head(sort(rules, by="lift"),100), file="physEHR.graphml")
-```
-
-
-
-
-
-## Analyzing the Effects of __ on ___ by ___.
-
-
-## Recombining Data with Other Non-hospital-affiliated Practitioners (whom we don't have EHR product information for)
-
-Now recombine these practitioners whom we have EHR usage information for with the rest of the non-hospital affiliated practitioners whom we don't have EHR usage information for.
-
-```{r}
-# read in phys.rds
-# group by unique NPI and practitioner-level characteristics
-# summarize locations and states
-# bind rows with phys_EHR and call it phys_all
+# saveAsGraph(head(sort(rules, by="lift"),100), file="physEHR.graphml")
 ```
 
