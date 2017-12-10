@@ -15,6 +15,7 @@ library(stringr)
 hosp_data <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/hosp.rds")
 #vendor_hosp <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/vendor_hosp.rds")
 #vendor_phys <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/vendor_phys.rds")
+hosp_demo_MoWv <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/hosp_demo_MoWv.rds")
 hosp_demo_data1 <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/hosp_demo_part1.rds")
 hosp_demo_data2 <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Project/hosp_demo_part2.rds")
 ```
@@ -24,7 +25,8 @@ hosp_demo_data2 <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Fina
 
 ```{r}
 #Row-bind the hospital demographics data 1(states ak to ma) and data2(states md to wy)
-hosp_demo_data <- rbind(hosp_demo_data1, hosp_demo_data2)
+hosp_demo_data <- rbind(hosp_demo_data1, hosp_demo_data2, hosp_demo_MoWv)
+#saveRDS(hosp_demo_data, file="hosp_demo_full_raw.rds")
 #1. Change the StaffedBeds,TotalDischarges, PatientDays, and Gross PatientRevenue into numeric vectors
 #Incomplete: gross_patient_revenue
 colnames(hosp_demo_data) <- c("Hospital_name", "City","Staffed_beds","Total_discharges", "Patient_days","Gross_patient_revenue", "State")
@@ -35,9 +37,10 @@ hosp_demo_cleaned1 = transform(hosp_demo_data, Staffed_beds = as.numeric(gsub(",
 
 #if all the variables are zero, drop the hospital 
 hosp_demo_cleaned2 <- hosp_demo_cleaned1[!hosp_demo_cleaned1$Gross_patient_revenue == 0, ]
+hosp_demo_cleaned2$State[hosp_demo_cleaned2$State =="ak_t"] <- "ak"
 setwd("~/Desktop/BST260-FALL2017/BST-260-Final-Project")
 #run this later
-#saveRDS(hosp_demo_cleaned2, file="hosp_demo_full.rds")
+saveRDS(hosp_demo_cleaned2, file="hosp_demo_full.rds")
 ```
 
 #Merge the cleanedhospital demographics data with the hosp_data

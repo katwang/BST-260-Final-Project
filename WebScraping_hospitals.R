@@ -72,6 +72,7 @@ wv <- read_html("https://www.ahd.com/states/hospital_WV.html") %>% html_nodes("t
 #as.data.frame.matrix(cat("al", "\n"))
 table_list <- c("ak","al", "ar", "az", "ca", "co", "ct", "dc", "de", "fl", "ga", "hi", "ia", "id", "il", "IN", "ks", "ky", "la", "ma")
 table_list <- c("md", "me", "mi", "mn", "mo", "ms", "nc", "nd", "ne", "nh", "nj", "nm", "nv", "ny", "oh", "ok", "or", "pa", "ri","sc", "sd", "tn", "tx", "ut", "va", "vt", "wa", "wi", "wy")
+table_list <- c("mt", "wv")
 hosp_demo_data = data.frame()
 for (table in table_list){
   #df_name <- paste(table,"_df",sep='') 
@@ -84,6 +85,7 @@ for (table in table_list){
 setwd("~/Desktop/BST260-FALL2017/BST-260-Final-Project")
 saveRDS(hosp_demo_data, file="hosp_demo_part1.rds")
 saveRDS(hosp_demo_data, file="hosp_demo_part2.rds")
+saveRDS(hosp_demo_data, file="hosp_demo_MoWv.rds")
 
 
 #########################For loop try - failed###############################
@@ -102,7 +104,7 @@ saveRDS(hosp_demo_data, file="hosp_demo_part2.rds")
 #   #rbind(new_df, t)
 # }
 
-
+getwd()
 
 
 

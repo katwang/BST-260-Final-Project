@@ -1,8 +1,8 @@
 ---
 title: "Hospital-Level Analysis"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -27,6 +27,13 @@ hosp_merged <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Pr
 table(hosp_merged$State.x)
 ```
 
+```{r}
+str(hosp_demo)
+hist(hosp_demo$Staffed_beds, breaks=20)
+ggplot(data=hosp_demo, aes(hosp_demo$Staffed_beds), colour="red") + geom_histogram()
+ggplot(data=hosp_demo, aes(hosp_demo$Total_discharges, fill=I("lightblue"), 
+      col=I("lightred"))) + geom_histogram()
+```
 #Aggregate data into hospital-level
 We now aggregate 'hosp_merged' data at hospital level so that each row is a unique hospital. 
 ```{r}
@@ -154,17 +161,22 @@ After taking log on the variables, we get much closer to normality for each vari
 #Conclusion: Confounding factor is the size of the hospital that influences all number of physicians, number of specialties, number of staffed beds, total discharges, gross patient revenue
 #Potential highest confounding factors are number of physicians-number of speciaties, staffed_beds - gross patient revenue, total discharge - patient days
 
-agg_data_cor <- agg_data[, c("EHR_use", "num_phys_log","female_prop","n_specialty","staffed_beds_log","total_discharge","patient_days", "gross_patient_rev_log","yrs_since_grad")]
-round(cor(agg_data_cor), 2)
+agg_data_cor1 <- agg_data[, c("EHR_use", "num_phys_log","female_prop","n_specialty","staffed_beds_log","total_discharge","patient_days", "gross_patient_rev_log","yrs_since_grad")]
+tidy(round(cor(agg_data_cor1), 2))
 
 #*Years since graduation comes out as NAs, so pull out yrs_since_grad correlation with only complete observations
-round(cor(agg_data_cor, use="complete.obs"), 2)
+agg_data_cor2 <- tidy(round(cor(agg_data_cor, use="complete.obs"), 2))
 #conclusion: weak negative correlation with all variables with all but female between -0.3 and 0. 
 #strongest correlation is thefemale proportion, with is -0.44
+```
 
+```{r}
 #Correlation Matrix with logged variables
-scatterplotMatrix(~num_phys_log+female_prop+yrs_since_grad+staffed_beds_log
-                  +gross_patient_rev_log|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
+scatterplotMatrix(~staffed_beds_log+total_discharge_log + patient_days_log
++gross_patient_rev_log|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
+
+agg_data_cor3 <- agg_data[, c("EHR_use" ,"staffed_beds_log","total_discharge_log","patient_days_log", "gross_patient_rev_log")]
+tidy(round(cor(agg_data_cor3), 2))
 ```
 
 #Stratification
@@ -192,11 +204,10 @@ agg_data %>%
 
 ##Proportion of EHR use depending on the number of physicians group
 agg_data %>% 
-  group_by(num_phys_grp) %>%
+  #group_by(num_phys_grp) %>%
   #filter(n() >= 10) %>%
   summarize(prob = mean(EHR_use)) %>%
-  ggplot(aes(num_phys_grp, prob)) +
-  geom_point()
+  ggplot(aes(staffed_beds_log, prob)) 
 
 ###Boxplot: Gross Revenue vs. Num_phys, staffed_beds_log + total_discharge + patient_days
 agg_data %>%
