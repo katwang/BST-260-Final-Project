@@ -4,25 +4,60 @@ author: Eunice Yeh
 output: html_document
 ---
 
-# Purpose
-1. explore the data and summarize key variables
-2. clean/reduce data: decide which rows and columns to filter out
 
-## 1. Exploratory Analysis
-Import data from `.csv` file, downloaded from the (Medicare Data website)[https://data.medicare.gov/Physician-Compare/Physician-Compare-National-Downloadable-File/].
+
+(move this to the first chapter of the book) Load `tidyverse` package for data wrangling and plotting functions.
 ```{r}
-dat <- read.csv("Physician_Compare_National_Downloadable_File.csv")
+library(tidyverse)
 ```
 
-Quick look at the data structure.
+
+# Purpose
+1. read in and understand the data
+2. explore the data and summarize key variables
+3. clean up/reduce data: wrangling decisions
+
+## 1. Understanding Practitioner Records
+
+(provide a brief intro/context to this data)
+
+(quick table of metadata)
+
+Import data from a `.csv` file that was downloaded from the (Medicare Data Website)[https://data.medicare.gov/Physician-Compare/Physician-Compare-National-Downloadable-File/].
+```{r load-phys-compare, cache=TRUE}
+# dat <- read.csv("Physician_Compare_National_Downloadable_File.csv")
+# limit = 1000 is the default API if i don't specify anything, so need to add limit=2254703 to get as close to the complete data as possible
+# since it is large, will not download certain columns, also specify this in the download link (looked thru metadata on the website to select variables i'm interested in) we've downloaded the csv file before and we know that the exact number of rows is 2254703 so we can specify this in the download link
+dat <- read.csv("https://data.medicare.gov/resource/c8qv-268j.csv?$limit=2254703&$select=npi,frst_nm,gndr,cred,med_sch,grd_yr,pri_spec,cty,st,zip,hosp_afl_1,hosp_afl_lbn_1,ehr")
+```
+
+
+```{r}
+saveRDS(dat, file="phys_all.rds")
+```
+
+
+Quick look at the data structure:
 ```{r}
 str(dat)
 ```
 
-Load `tidyverse` package for data wrangling and plotting functions.
+We are starting with 2,254,703 records of 41 variables in our practitioner data. To save time and space, the first thing we want to do is to use the process of elimination to remove columns that we know for sure would not inform our wrangling nor the analysis. Since NPI is the only "identification number" we will use to match individual practitioner to the vendor dataset, we can delete all other "identification numbers", i.e., any of the variables that end in `.ID` in `dat`. We also technically don't need the names of each practitioner, but we will keep the First and Last names just to help ease data wrangling (we prefer to read real names than stare at their NPIs as a form of identification per record). The specific address lines are unnecessarily detailed, keeping the City, State, and Zip Code in our dataset will suffice. Not sure what we could use the phone number for. Since we decided not to analyze specific quality measures anymore, we won't need to filter on practitioners who responded yes to the `Reported.Quality.Measures` column. We also don't care about whether or not a practitioner committed to heart health through the Million Hearts Initiative. The rest of the variables seem potentially interesting and/or useful to keep.
 ```{r}
-library(tidyverse)
+dat <- dat %>% select(-ends_with(".ID"), -Middle.Name, -Suffix, -Line.1.Street.Address, -Line.2.Street.Address, -Marker.of.address.line.2.suppression, -Phone.Number, -Reported.Quality.Measures, -Committed.to.heart.health.through.the.Million.HeartsÂ..initiative.)
 ```
+
+We now have 30 somewhat more meaningful variables that can help us understand the data in more depth, so that we can prepare it better for our analyses. Let's continue learning about the structure of our data by answering a few questions:
+
+1. What is the level of uniqueness for each record? If multiple records exist per practitioner, we need to find out which characteristics are defining the uniqueness for each record.
+```{r}
+dat %>% group_by(NPI) %>% summarize()
+```
+
+2. How clean/dirty is our data? Does each of these "more meaningful" variables actually hold valid values across all records?
+
+
+## 2. Exploring Key Variables of Interest
 
 Look at the distribution of physician graduation year by physician credentials and by use of EHR.
 ```{r}
@@ -155,10 +190,10 @@ filtered_dat <- new_dat %>% filter(Professional.accepts.Medicare.Assignment == '
 table(filtered_dat$Professional.accepts.Medicare.Assignment)
 ```
 
-3. key variables are NPI, last and first name, gender, credential, medical school name, grad year, prim specialty, all sec specialties,  organization legal name, num of group practice members, city, state, zip code,  hospital affiliation CCNs and LBNs,  used EHR, reported qual measures.
+3. key variables are NPI, last and first name, gender, credentials, medical school name, grad year, prim specialty, all sec specialties, organization legal name, num of group practice members, city, state, zip code, hospital affiliation CCNs and LBNs, used EHR.
 
 ```{r}
-filtered_dat <- new_dat
+filtered_dat <- new_dat # temp, debating if we can just ignore Professional.accepts.Medicare.Assignment
 rm(new_dat)
 # easier to exclude than to type out all the variables to include
 select_dat <- filtered_dat %>% select(-PAC.ID, -Professional.Enrollment.ID, -Middle.Name, -Suffix, -Group.Practice.PAC.ID, -Line.1.Street.Address, -Line.2.Street.Address, -Marker.of.address.line.2.suppression, -Phone.Number, -Professional.accepts.Medicare.Assignment, -Reported.Quality.Measures, -Committed.to.heart.health.through.the.Million.HeartsÂ..initiative.)
@@ -224,20 +259,18 @@ complete_zip <- zip_dat %>%
 ```
 
 
-5. keep only one record per physician (using NPI, first/last name, primary specialty and City, State and full zip code just to be extra precise)
+5. keep only one record per physician per location (using NPI, first/last name, and City, State and full zip code just to be extra precise) since we will be matching on NPI and zip code with the EHR vendor information dataset and matching on hospital affiliation and state with the hospital data.
 ```{r}
 rm(zip_dat, zip_mismatch, zip_fix, mismatch_tokeep)
 
-unique_dat <- complete_zip %>% distinct(NPI, Last.Name, First.Name, Primary.specialty, City, State, Zip.Code, .keep_all = TRUE)
-
-# there are a few physicians who have multiple primary specialty (all other distinct columns stayed constant), although the most is having two specialities and there are only 17 of these cases. We will take out primary specialty as a unique factor.
-unique_dat %>% group_by(NPI, City, State, Zip.Code) %>% summarize(n = n()) %>% arrange(desc(n)) %>% filter(n > 1)
+# side note: theoretically each physician should only be reporting one primary specialty and should report any additional specialties into the secondary specalty columns, but not every practitioner did that. So as dirty as the data can be, there are indeed a few physicians who have multiple primary specialty records (all distinct columns stayed constant), although the most is having two specialities and there are only 17 of these cases.
+complete_zip %>% group_by(NPI, City, State, Zip.Code) %>% filter(n() > 1 | n_distinct(Primary.specialty) > 1) 
 
 unique_dat <- complete_zip %>% distinct(NPI, Last.Name, First.Name, City, State, Zip.Code, .keep_all = TRUE) %>% select(-city, -state) # no longer need the city and state from zipcode package
 ```
 Note that the argument `.keep_all = TRUE` keeps all other variables not considered in the combination of variables that determine the uniqueness. If the combination is not distinct, the first row of values is kept, which is fine because we don't really care as much about the other variables. For example, the organization legal name and city may vary across multiple rows for the same physician who owns a private practice and renames or moves the practice around the area but still within the same state.
 
-6. separate into two datasets by hospital affiliation vs. none
+6. separate into two datasets by hospital affiliation vs. none for analyses: we're assuming that those affiliated with any hospital don't really decide whether or not they want to use EHR so we can't look at the effects of their demographics on the choice of EHR usage, instead we will look at the demographics of their affiliated hospitals; and focus on the analyzing the effects of practitioner demographics on the choice of EHR usage among those who are not affiliated with any hospitals.
 
 ```{r}
 # those with some kind of hospital affiliation
@@ -245,8 +278,24 @@ hosp <- unique_dat %>% filter(Hospital.affiliation.CCN.1 != "" | Hospital.affili
 saveRDS(hosp, file="hosp.rds")
 
 # those without any hospital affiliation
-phys <- unique_dat %>% filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5)) # use rgrep to remove all the hospital affiliation CCN and LBN columns later
+phys <- unique_dat %>% 
+  filter(Hospital.affiliation.CCN.1 == "" & Hospital.affiliation.CCN.2 == "" & Hospital.affiliation.CCN.3 == "" & Hospital.affiliation.CCN.4 == "" & is.na(Hospital.affiliation.CCN.5)) %>%
+  # filter_at(vars(starts_with("Hospital")), all_vars(. == "")) %>% 
+  # filter(is.na(Hospital.affiliation.CCN.5)) %>% # CCN5 is the only one that's integer so has NAs instead of blanks
+  select(-starts_with("Hospital.affiliation"))
 saveRDS(phys, file="phys.rds")
 ```
+
+
+
+
+
+
+
+
+
+
+
+
 
 

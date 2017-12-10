@@ -150,3 +150,77 @@ exp(cbind(OR = coef(model), confint(model)))
 
 should we do a predicted probability of ehr use at each level of gender, years since graduation, and location?
 
+
+
+### predictive probability
+We will start by calculating the predicted probability of EHR use at each value of gender, holding location and years since graduation at their means
+
+```{r}
+(means <- with(EPs, data.frame(yrs_grd = mean(yrs_grd), locations = mean(locations), gndr = factor(c('M','F')))))
+
+# compute the predicted probabilities for each case
+means$gndrP <- predict(model, newdata = means, type = "response")
+means
+
+```
+
+looks right. but not as interesting if we only have two cases. let's do it over varying values of years since graduation and gender.
+
+```{r}
+# create a table of predicted probabilities varying the value of years since graduation and gender
+varyvals <- with(EPs, data.frame(yrs_grd = rep(seq(from = min(yrs_grd), to = max(yrs_grd), length.out = 100),
+    2), locations = mean(locations), gndr = factor(rep(c('M','F'), each = 100))))
+pred <- cbind(varyvals, predict(model, newdata = varyvals, type = "link",
+    se = TRUE))
+pred <- within(pred, {
+    PredictedProb <- plogis(fit)
+    LL <- plogis(fit - (1.96 * se.fit))
+    UL <- plogis(fit + (1.96 * se.fit))
+})
+```
+
+plot the predicted probs on a ribbon plot
+```{r}
+ggplot(pred, aes(x = yrs_grd, y = PredictedProb)) + 
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = gndr), alpha = 0.2) + 
+  geom_line(aes(colour = gndr), size = 1)
+```
+
+
+
+```{r}
+with(model, null.deviance - deviance)
+with(model, df.null - df.residual)
+with(model, pchisq(null.deviance - deviance, df.null - df.residual, lower.tail = FALSE))
+logLik(model)
+```
+
+
+
+
+
+
+
+### confusion matrix (did not work very well)
+
+
+try testing and training to assess for model fit
+```{r}
+library(caret)
+Train <- createDataPartition(EPs$ehr, p=0.6, list=FALSE)
+training <- EPs[Train, ]
+testing <- EPs[-Train, ]
+```
+
+```{r}
+model <- glm(ehr ~ gndr + yrs_grd + locations, data = training, family = binomial)
+summary(model)
+p_hat_logit <- predict(model, newdata = testing, type="response")
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 0,  1)
+confusionMatrix(data = y_hat_logit, reference = testing$ehr)
+```
+
+
+
+
+

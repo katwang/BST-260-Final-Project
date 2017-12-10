@@ -1,0 +1,152 @@
+---
+title: "Untitled"
+author: "Katherine Wang"
+date: "12/9/2017"
+output: html_document
+---
+
+```{r}
+##to be replaced by table
+X <- c("num_phys", "female_prop", "avg_grad_year", "n_specialty", "staffed_beds", "total_discharge", "patient_days", "gross_patient_rev")
+cor(agg_data$num_phys, agg_data$EHR_use)
+cor(agg_data$female_prop, agg_data$EHR_use)
+cor(agg_data$yrs_since_grad, agg_data$EHR_use, use="complete.obs")
+cor(agg_data$n_specialty, agg_data$EHR_use)
+cor(agg_data$staffed_beds, agg_data$EHR_use)
+cor(agg_data$total_discharge, agg_data$EHR_use)
+cor(agg_data$patient_days, agg_data$EHR_use)
+cor(agg_data$gross_patient_rev, agg_data$EHR_use)
+
+#Correlation Matrix
+my_colors <- brewer.pal(nlevels(as.factor(agg_data$EHR_char)), "Set1")
+scatterplotMatrix(~num_phys+female_prop+yrs_since_grad+staffed_beds+gross_patient_rev|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
+```
+
+While checking for correlations between the variables, we noticed that many of them are not normally distributed. We rescaled the variables on the log scale.
+```{r}
+agg_data$num_phys_log <- round(log(agg_data$num_phys),2)
+agg_data$staffed_beds_log <- round(log(agg_data$staffed_beds),2)
+agg_data$gross_patient_rev_log <- round(log(agg_data$gross_patient_rev),2)
+agg_data$total_discharge_log <- round(log(agg_data$total_discharge),2)
+agg_data$patient_days_log<- round(log(agg_data$patient_days),2)
+```
+
+```{r}
+agg_data_cor <- agg_data[, c("EHR_use", "num_phys_log","female_prop","n_specialty","staffed_beds_log","total_discharge","patient_days", "gross_patient_rev_log","yrs_since_grad")]
+round(cor(agg_data_cor, use="complete.obs"), 2)
+```
+
+After rescaling the variables, the following variables were found to be highly correlated:
+* number of physicians/number of specialties
+* number of physicians/gross patient revenue
+* number of staffed beds/total number of discharges
+* number of staffed beds/average patient days
+* number of staffed beds/gross patient revenue
+* total number of discharges/average patient days
+* total number of discharages/gross patient revenue
+* number of specialties/gross patient revenue
+
+Years since graduation was the only variable with negative correlations to the other variables, but most of them were weak.
+
+We also then recreated the correlation matrix with the logged variables.
+```{r}
+scatterplotMatrix(~num_phys_log+female_prop+yrs_since_grad+staffed_beds_log
+                  +gross_patient_rev_log|EHR_char, data=agg_data, col=my_colors , smoother.args=list(col="grey") , cex=1.5 , pch=c(15,16))
+```
+
+
+```{r}
+agg_data$num_phys_grp = cut(agg_data$num_phys, quantile(agg_data$num_phys, prob = seq(0, 1, .2)), include.lowest = TRUE)
+agg_data$gpr_grp = cut(agg_data$gross_patient_rev, quantile(agg_data$gross_patient_rev, prob = seq(0, 1, .2)), include.lowest = TRUE)
+#correlation between number of physicians and gross patientrevenue 
+plot(agg_data$num_phys_log, agg_data$gross_patient_rev_log)
+```
+
+The two variables most strongly correlated with EHR use, number of physicians and gross patient revenue, were also strongly correlated with each other. This may be because these variables are both indicators of hospital size. We'll stratify on gross patient revenue to remove any confounding by gross patient revenue. 
+
+```{r}
+#(lauren - replace with ribbon plot?)
+#grouped to show probability of EHR use among different levels(groups) of gross patient revenue
+agg_data$num_phys_grp = cut(agg_data$num_phys, quantile(agg_data$num_phys, prob = seq(0, 1, .2)), include.lowest = TRUE)
+agg_data$gpr_grp = cut(agg_data$gross_patient_rev, quantile(agg_data$gross_patient_rev, prob = seq(0, 1, .2)), include.lowest = TRUE)
+#correlation between number of physicians and gross patientrevenue 
+plot(agg_data$num_phys_log, agg_data$gross_patient_rev_log)
+```
+
+```{r}
+# lauren to fix this
+##Proportion of EHR use depending on the gross patient revenue group
+agg_data %>% 
+  group_by(gpr_grp) %>%
+  #filter(n() >= 10) %>%
+  summarize(prob = mean(EHR_use)) %>%
+  ggplot(aes(gpr_grp, prob)) +
+  geom_point() 
+```
+
+```{r}
+# lauren to fix this
+##Proportion of EHR use depending on the number of physicians group
+agg_data %>% 
+  group_by(num_phys_grp) %>%
+  summarize(prob = mean(EHR_use)) %>%
+  ggplot(aes(num_phys_grp, prob)) +
+  geom_point()
+
+###Boxplot: Gross Revenue vs. Num_phys, staffed_beds_log + total_discharge + patient_days
+agg_data %>%
+  ggplot(aes(gpr_grp, total_discharge)) +
+  geom_boxplot()
+```
+
+From these plots, we confirmed we should stratify on gross patient revenue.
+
+### Logistic Regression Model
+
+
+##Test and Train Datasets
+
+```{r}
+library(caret)
+Train <- createDataPartition(agg_data$EHR_use, p=0.6, list=FALSE)
+training <- agg_data[Train, ]
+testing <- agg_data[-Train, ]
+```
+
+In our logistic regression model, we included an interaction term between gross patient revenue and number of staffed beds to account for the potential bases mentioned earlier.
+
+```{r}
+glm3 <- glm(EHR_use ~ gross_patient_rev_log + staffed_beds_log  + gross_patient_rev_log*staffed_beds_log, data=training, family = "binomial")
+summary(glm3)
+
+p_hat_logit <- predict(glm3, newdata = testing, type="response")
+y_hat_logit <- ifelse(p_hat_logit > 0.5, 1,  0)
+confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
+```
+
+```{r}
+##MODEL ESTIMATE PLOTS
+agg_data %>%
+  group_by(gpr_grp) %>%
+  do(tidy(glm3)) %>%
+  #filter(!grepl("Intercept", term))%>%
+  ggplot(aes(gpr_grp, estimate, group = term, col = term)) +
+  geom_line() + 
+  geom_point()
+```
+
+```{r}
+#confidence intervals with log-likelihood
+confint(glm3)
+#table of 95% confidence intervals
+
+#CIs using standard errors
+confint.default(glm3)
+
+#table of odds ratios
+exp(coef(glm3))
+
+#table of odds ratios with 95% CI
+exp(cbind(OR = coef(glm3), confint(glm3)))
+```
+

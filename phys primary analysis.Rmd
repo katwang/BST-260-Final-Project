@@ -1,0 +1,269 @@
+---
+title: "Untitled"
+author: "Katherine Wang"
+date: "12/9/2017"
+output: html_document
+---
+
+Since practitioners who are affiliated with a hospital may not have a choice in using EHR or not, we will exclude these from our analysis population, which is now just the practitioners who enrolled in the Medicare Incentive Program who are not affiliated with any hospital, which come from the dataset we cleaned earlier: `phys.rds`.
+
+```{r}
+library(tidyverse)
+phys <- readRDS("phys.rds")
+```
+
+## Primary Analysis: Effects of Practitioner Demographics on the Use of EHR (Exploratory: Show some correlations)
+
+We need to get a unique row per practitioner in order to fit a logistic regression model on practitioner-level demographics and EHR use.
+```{r}
+reg <- phys %>% 
+  group_by(NPI, First.Name, Last.Name, Primary.specialty, Gender, Medical.school.name, State,
+           Graduation.year, Used.electronic.health.records) %>% 
+  summarize(locations = n_distinct(Zip.Code)) #%>%  # the number of practices based on distinct locations
+  mutate(EHRuse = case_when(Used.electronic.health.records == 'Y' ~ 1, # EHR use = 1
+                            Used.electronic.health.records == '' ~ 0)) # No response to EHR use = 0
+test <- phys %>% group_by(NPI) %>% summarize(nfirst = n_distinct(First.Name), 
+                                             nlast = n_distinct(Last.Name), 
+                                             nprim = n_distinct(Primary.specialty), 
+                                             ngend = n_distinct(Gender), 
+                                             nmed = n_distinct(Medical.school.name), 
+                                             nstate = n_distinct(State), 
+                                             ngrad = n_distinct(Graduation.year), 
+                                             nehr = n_distinct(Used.electronic.health.records))
+# for now do this:
+reg <- phys %>% distinct(NPI, .keep_all = TRUE)
+```
+
+** describe some math to explain the theory of our model here **
+
+Before fitting our model, we explored the relationships between our variables of interest using 
+Association Rule Learning. We tried this method because we had many categorical variables with many levels. 
+
+Here, each "transaction" is a practitioner who adapted EHR as part of the Medicare EHR Incentive Program in the U.S.
+
+```{r}
+library("arulesViz")
+
+# first need to keep certain associational variables of interest and discretize them
+corr <- reg %>% ungroup() %>% filter(Medical.school.name != "OTHER") %>% 
+  select(Gender, Graduation.year, Primary.specialty, State) %>% 
+  mutate(gradyr = as.factor(Graduation.year),
+         state = as.factor(State)
+         ) %>% 
+  select(-Graduation.year, -State)
+View(corr)
+
+# convert from a data frame to a transaction dataset
+corrt <- as(corr, "transactions")
+
+# create rules using the apriori
+rules <- apriori(corrt, parameter=list(support=0.01, confidence=0.5))
+plot(rules)
+```
+
+The result is a set of ___ association rules with generally high confidence and low support (proportion of transactions in the dataset which contain the itemset). Let's first trim this down a bit to show only important rules (confidence > 0.85). We'll pick the top 30 rules so we have a smaller subset to find meaningful relationships.
+
+The top 30 rules are chosen with respect to the lift measure (a measure of rule strength) - the deviation of the support of the whole rule from the support expected under independence given the supports of both sides of the rule.
+
+```{r}
+subrules <- rules[quality(rules)$confidence > 0.85]
+inspect(head(sort(subrules, by ="lift"),30))
+plot(subrules, method="grouped", control=list(k=50))
+```
+
+We concluded the following:
+
+* Practitioner graduation year is not very interesting
+* Medical School, Primary Specialty, and Gender had the most meaninful associations 
+    - However, we would choose only one of medical school or primary specialty. They are likely highly correlated because there are specialty-specific schools such as chiropractic schools.
+
+
+## Exploring the Characteristics of Non-hospital-affiliated Practitioners Who Use EHR
+
+1. Check the distributions of number of practice locations, states, products, and vendors among practitioners whom we have EHR usage information on. Counts of these distributions are the number of practitioners.
+
+
+2. Explore practitioner demographics: gender, graduation year, medical school attended, primary specialty.
+
+
+
+```{r}
+phys_EHR %>% group_by(Graduation.year) %>% select(products) %>% table()
+```
+
+** ADD LATER: show N's at each point of the x-axis **
+
+```{r}
+phys_EHR %>%
+  ggplot(aes(factor(products), Graduation.year)) +
+  geom_boxplot() + 
+  facet_grid(.~Gender) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.25)) +
+  xlab("Number of EHR Products") +
+  ylab("Graduation Year") +
+  ggtitle("Dist of Grad Year by Number of EHR Products Used by Gender")
+```
+
+
+3. Perform Association Rule Learning on all variables from the first two sections. **check the validity of using this method if my variables are not independent from one another.**
+Here, each "transaction" is a practitioner who adapted EHR as part of the Medicare EHR Incentive Program in the U.S.
+***used becuse we have variables with a lot of variables
+
+
+```{r}
+library("arulesViz")
+
+# need to keep certain associational variables of interest and discretize them
+assoc <- phys_EHR %>% ungroup() %>% 
+  select(-NPI, -First.Name, -Last.Name, -Used.electronic.health.records, -EHRuse) %>% 
+  mutate(Gradyr = as.factor(Graduation.year),
+         State = as.factor(state_abb),
+         locations = as.factor(locations),
+         products = as.factor(products),
+         vendors = as.factor(vendors)
+         ) %>% 
+  select(-Graduation.year, -state_abb)
+View(assoc)
+
+# convert from a data frame to a transaction dataset
+assoctrans <- as(assoc, "transactions")
+
+# create rules using the apriori
+rules <- apriori(assoctrans, parameter=list(support=0.01, confidence=0.5))
+plot(rules)
+```
+
+The result is a set of 4152 association rules with generally high confidence and low support (proportion of transactions in the dataset which contain the itemset). Let's first trim this down a bit to show only important rules (confidence > 0.85). We'll pick the top 30 rules so we have a smaller subset to find meaningful relationships.
+
+The top 30 rules are chosen with respect to the lift measure (a measure of rule strength) - the deviation of the support of the whole rule from the support expected under independence given the supports of both sides of the rule.
+
+```{r}
+subrules <- rules[quality(rules)$confidence > 0.85]
+inspect(head(sort(subrules, by ="lift"),30))
+plot(subrules, method="grouped", control=list(k=50))
+```
+
+
+* The top 18 rules show that the strongest associations are among practitioners who use 5 EHR products across 2 different vendors in the state of Minnesota within a single practice. 
+* The second highest set of rules shows a strong association among practitioners who use 7 EHR products across 2 different vendors in the state of California within a single practice.
+
+To explore the top rules, we created a couple visualizations.
+
+We can visualize these top 18 rules using a directed network graph where the items are vertices and the directed edges are the rules in the direction of the antecedent (IF) to the consequent (THEN). (check this?)
+
+```{r}
+top18 <- head(sort(subrules, by ="lift"),18)
+plot(top18, method="graph") # uses items and rules as vertices connecting them with directed edges 
+plot(top18, method="graph", control=list(type="itemsets")) # uses itemsets as vertices and rules are represented by directed edges
+```
+
+In a parallel coordinates plot, the width of the arrows represents support and the intensity of the color represent confidence. We plotted the top 18 rules.
+
+```{r}
+plot(top18, method="paracoord", control=list(reorder=TRUE))
+```
+
+Explore these rules interactively.
+```{r}
+saveAsGraph(head(sort(rules, by="lift"),100), file="physEHR.graphml")
+```
+
+Using Associative Rule Learning, we found the following factors were important:
+
+* number of EHR products used
+* number of vendors used
+* region (states)
+
+The results from the physician-vendor data was not that helpful, so we decided not to use it in our final model.
+
+## Exploratory for model
+
+```{r}
+library(GGally)
+library(reshape2)
+library(lme4)
+library(lattice)
+library(boot)
+library(parallel)
+library(compiler)
+```
+Need to find independent continuous variables
+
+1. Years since graduation by gender
+```{r}
+# violin plots with jittering for years since graduation by gender
+EPs %>% melt(id.vars="gndr", measure.vars="yrs_grd") %>% 
+  ggplot(aes(gndr, value)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0.75) +
+  facet_grid(variable ~ .) +
+  scale_y_sqrt()
+```
+
+Gender seems to be pretty independent of the number of years since graduation so we should be able to add both to the model without influencing each other's effects. The distribution of years since graduation is skewed, so we used a square root scale to make the kernel density curves look more symmetric in the plots than it otherwise would have been. The actual values of the years since graduation were left alone so we could intuitively interpret the results from our model.
+
+2. Number of locations by gender
+```{r}
+# violin plots with jittering for locations by gender
+EPs %>% melt(id.vars="gndr", measure.vars="locations") %>% 
+  ggplot(aes(gndr, value)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0.75) +
+  facet_grid(variable ~ .) +
+  scale_y_log10()
+```
+
+**add plot for distribution of location values (independently of any other vairalbes)**
+While practice locations seem to be distributed evenly between males and females, we felt that this information may not be valuable to add to the final model because the large majority of physicians in our dataset have only one location. There are a few outliers who have over 300 unique zipcodes associated with their practices.
+
+3. Credentials by years since graduation
+```{r}
+EPs %>% mutate(cred = reorder(cred, yrs_grd)) %>% 
+  ggplot(aes(cred, yrs_grd)) +
+  stat_sum(aes(size = ..n.., group = 1)) +
+  scale_size_area(max_size = 10)
+```
+
+Credentials (physician degrees) had one of the fewest number of levels, so we wanted to see if it was a good candidate for our model. The distribution of years since graduation looked pretty consistent across different credentials. Unfortunately, there were disproportionally high numbers of physicians with credentials listed as N/A (~75%), meaning their credential was unknown, so we could not use this variable in our model.
+
+4. gender and years since graduation and EHR use *eunice write paragraph/add corr matrix*
+```{r}
+# gender and years since graduation and EHR use
+EPs %>% ggpairs(columns = c("gndr", "yrs_grd", "ehr"))
+
+# years since graduation by EHR use
+EPs %>% ggplot(aes(ehr, yrs_grd)) +
+  stat_sum(aes(size = ..n.., group = 1)) +
+  scale_size_area(max_size = 10)
+
+# years since graduation by EHR use
+EPs %>% melt(id.vars="ehr", measure.vars="yrs_grd") %>% 
+  ggplot(aes(ehr, value)) +
+  geom_jitter(alpha = 0.1) +
+  geom_violin(alpha = 0.75) +
+  facet_grid(variable ~ .) +
+  scale_y_sqrt()
+```
+
+_a general observation is that there are proportionally more physicians in our data who have not used EHR. so we already have an imbalance in sample size between the two groups. but overall, our sample size is still large enough._
+
+```{r}
+# fit the model
+model <- glm(ehr ~ gndr + yrs_grd + locations, data = EPs, family = binomial)
+summary(model)
+
+# confidence intervals with log-likelihood
+confint(model)
+
+#table of 95% confidence intervals
+
+# CIs using standard errors
+confint.default(model)
+
+#table of odds ratios
+exp(coef(model))
+
+#table of odds ratios with 95% CI
+exp(cbind(OR = coef(model), confint(model)))
+```
+
