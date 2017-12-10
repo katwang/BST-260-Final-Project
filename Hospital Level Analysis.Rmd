@@ -27,13 +27,6 @@ hosp_merged <- readRDS("/Users/jiminyoo/Desktop/BST260-FALL2017/BST-260-Final-Pr
 table(hosp_merged$State.x)
 ```
 
-```{r}
-str(hosp_demo)
-hist(hosp_demo$Staffed_beds, breaks=20)
-ggplot(data=hosp_demo, aes(hosp_demo$Staffed_beds), colour="red") + geom_histogram()
-ggplot(data=hosp_demo, aes(hosp_demo$Total_discharges, fill=I("lightblue"), 
-      col=I("lightred"))) + geom_histogram()
-```
 #Aggregate data into hospital-level
 We now aggregate 'hosp_merged' data at hospital level so that each row is a unique hospital. 
 ```{r}
@@ -165,7 +158,7 @@ agg_data_cor1 <- agg_data[, c("EHR_use", "num_phys_log","female_prop","n_special
 tidy(round(cor(agg_data_cor1), 2))
 
 #*Years since graduation comes out as NAs, so pull out yrs_since_grad correlation with only complete observations
-agg_data_cor2 <- tidy(round(cor(agg_data_cor, use="complete.obs"), 2))
+agg_data_cor2 <- tidy(round(cor(agg_data_cor1, use="complete.obs"), 2))
 #conclusion: weak negative correlation with all variables with all but female between -0.3 and 0. 
 #strongest correlation is thefemale proportion, with is -0.44
 ```
@@ -180,7 +173,6 @@ tidy(round(cor(agg_data_cor3), 2))
 ```
 
 #Stratification
-Two variables most strongly correlated with EHR use--number of physicians(corr=0.55), and gross_patient_rev_log(corr=0.45)--are also correlated to each other. We believed that the hospital size is a confounding factor that affects both the number of physicians and gross patient revenue. Thus, we will test this theory by stratifying on gross patient revenue. 
 ```{r}
 hist(agg_data$num_phys)
 hist(agg_data$gross_patient_rev)
@@ -328,3 +320,4 @@ exp(coef(glm3))
 #table of odds ratios with 95% CI
 exp(cbind(OR = coef(glm3), confint(glm3)))
 ```
+#Interpretation
