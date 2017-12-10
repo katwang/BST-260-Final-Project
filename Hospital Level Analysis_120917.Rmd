@@ -249,14 +249,14 @@ confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
 ```
 
 **TEST GLM2
-Because total discharge and patient days have very high correlation (0.99), pick out one out of the two -  total discharge. Also, because we observed from correlation plots that staffed beds and the gross patient revenue are highly correlated, we add interaction variable to the model. 
+Because total discharge and patient days have very high correlation (0.99), we will remove one of the two from the model--let's move the patient days. Also, because we observed from correlation plots that staffed beds and the gross patient revenue are highly correlated, we add interaction variable to the model.  
 ```{r}
 glm2 <- glm(EHR_use ~ gross_patient_rev_log + staffed_beds_log  + gross_patient_rev_log*staffed_beds_log + total_discharge_log, data=training, family = "binomial")
 summary(glm2)
 ```
 
 **TEST GLM3
-This time, we will pick total discharge in stead of the staffed beds. Then we will compare two models (glm2 vs. glm3) using chisquare test.
+Let's remove staffed beds from the above model since neither the staffed beds nor the interaction term between revenue:beds was significant. Then we will compare two models (glm2 vs. glm3) using chisquare test.
 ```{r}
 glm3 <- glm(EHR_use ~ gross_patient_rev_log + total_discharge_log + gross_patient_rev_log*total_discharge_log, data=training, family = "binomial")
 summary(glm3)
@@ -265,11 +265,50 @@ p_hat_logit <- predict(glm4, newdata = testing, type="response")
 y_hat_logit <- ifelse(p_hat_logit > 0.5, 1, 0)
 confusionMatrix(data = y_hat_logit, reference = testing$EHR_use)
 #chisquare test H0(null model): glm2, H1(alternative model):glm3
-anova(glm3, glm4, test="Chisq")
+anova(glm2, glm3, test="Chisq")
 ```
-Because the anova test yields that glm3 is better, our final model is glm3:
+
+Because the anova test yields that glm3 is slightly better (p-value: 0.06), our final model is glm3:
 [FINAL MODEL]
 
+#Calculate odds ratio and CI
+Our final model is glm3 with two variables: staffed beds and gross revenue. 
+```{r}
+final_model <- glm3
+summary(glm3)
+#confidence intervals with log-likelihood
+confint(final_model)
+#table of 95% confidence intervals
+#CIs using standard errors
+confint.default(final_model)
+#table of odds ratios
+exp(coef(final_model))
+#table of odds ratios with 95% CI
+exp(cbind(OR = coef(final_model), confint(final_model)))
+
+#any 10% increase in math score
+#the expected ratio of the two geometric means for writing score will be 1.10^β2 = 1.10^.4085369 = 1.0397057. 
+#In other words, we expect about 4% increase in writing score when math score increases by 10%. 
+
+1.10^(1.10) = 1.11 
+1.10^(1.24) =1.125
+rev_log = log(10000)
+discharge_log = log(5000)
+-16.267 + 1.1022*rev_log + 1.2411*discharge_log - 0.0455*(rev_log*discharge_log)
+#when rev=10000, discharge=5000, 0.886
+#when rev=11000, discharge=5000, 0.954: by 10% increase in the revenue, the log(1/1-p) increases by 7.05%
+#odds (1/1-p) = 2.94
+#when rev=10000, discharge=5500, 0.964: by 10% increase in the discharge, the log(1/1-p) increases by 8.15%
+#odds (1/1-p) = 2.97 
+
+odds_revenue = 1.1022*log(1.1) -0.0455*log(1.1)*discharge_log
+odds_discharge = 1.2411*log(1.1) -0.0455*log(1.1)*rev_log
+```
+Interpretation of the final model: If the total discharge is equal at 5000, with the 10% increase in the revenue, the odds of using EHR is 2.92 times higher. Similarly, if the gross patient revenue is equal at 5000 and the discharged increases by 10%, the odds of using EHR is 2.95 times higher.
+
+Mathematically, if revenue increases 10% and discharge is the same, the odds of using EHR is the higher by "1.102*log(1.1)-0.046*log(1.1)*log(discharge)" times. If discharge increases by 10% while the revenue is the same, the odds of using EHR is higher by "1.2411*log(1.1) - 0.046*log(1.1)*log(revenue)" 
+
+##EXTRA STUFF
 #More on Gross Revenue and Total discharge_grp
 ```{r}
 ##Proportion of EHR use depending on the gross patient revenue group
@@ -323,20 +362,4 @@ agg_data %>%
 #     ymax = UL, fill = rank), alpha = 0.2) + geom_line(aes(colour = rank),
 #     size = 1)
 ```
-#Calculate odds ratio and CI
-Our final model is glm3 with two variables: staffed beds and gross revenue. 
-```{r}
-final_model <- glm3
-#confidence intervals with log-likelihood
-confint(final_model)
-#table of 95% confidence intervals
 
-#CIs using standard errors
-confint.default(final_model)
-
-#table of odds ratios
-exp(coef(final_model))
-
-#table of odds ratios with 95% CI
-exp(cbind(OR = coef(final_model), confint(final_model)))
-```
