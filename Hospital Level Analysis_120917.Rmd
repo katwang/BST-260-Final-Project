@@ -210,6 +210,8 @@ agg_data %>%
 ```{r}
 agg_data$num_phys_grp = cut(agg_data$num_phys, quantile(agg_data$num_phys, prob = seq(0, 1, .2)), include.lowest = TRUE)
 agg_data$gpr_grp = cut(agg_data$gross_patient_rev, quantile(agg_data$gross_patient_rev, prob = seq(0, 1, .2)), include.lowest = TRUE)
+which(is.na(agg_data$gross_patient_rev)==TRUE)
+agg_data[which(agg_data$Hospital.affiliation.LBN.1=="ALASKA NATIVE MDEICAL CENTER"), ]
 agg_data$discharge_grp = cut(agg_data$total_discharge, quantile(agg_data$total_discharge, prob = seq(0, 1, .2)), include.lowest = TRUE)
 
 #LATTICE plot with gpr_grp group as each panel
@@ -220,7 +222,7 @@ agg_data$discharge_grp = cut(agg_data$total_discharge, quantile(agg_data$total_d
 #Simply all prediction variables
 ```{r}
 #Test out each predictor variable's significance when stratified by gpr_grp
-filter_var = "total_discharge_log"
+filter_var = "staffed_beds_log"
 agg_data %>%
     group_by(gpr_grp) %>%
     do(tidy(glm(EHR_use ~ num_phys_log + staffed_beds_log + total_discharge_log + patient_days_log, data = .), conf.int = TRUE)) %>%
