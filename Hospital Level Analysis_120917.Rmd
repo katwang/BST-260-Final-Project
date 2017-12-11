@@ -93,6 +93,24 @@ ggplot(agg_data, aes(num_phys, colour = EHR_char)) +
   geom_density() +
   xlim(0, 500)
 
+#Density plot: gross patient revenue vs. EHR 
+ggplot(agg_data, aes(gross_patient_rev, colour = EHR_char)) +
+  geom_density() +
+  labs(x="Gross Patient Revenue", title="Gross Patient Revenue, by EHR-adoption", size=3) +
+  xlim(0,5000000)
+  #look into narrower range
+ggplot(agg_data, aes(gross_patient_rev, colour = EHR_char)) +
+  geom_density() +
+  labs(x="Gross Patient Revenue", title="Gross Patient Revenue, by EHR-adoption", size=3) +
+  xlim(0,500000)
+
+#Density plot: total discharge vs. EHR 
+ggplot(agg_data, aes(total_discharge, colour = EHR_char)) +
+  geom_density()+
+  labs(x="Total Discharge",title="Total Discharge, by EHR-adoption", size=5)+
+  xlim(0,30000)
+
+
 boxplot(staffed_beds~EHR_char,data=agg_data, 
         xlab="EHR Use", ylab="Staffed_beds", ylim = c(0,1000))
 boxplot(total_discharge~EHR_char,data=agg_data, 
